@@ -1,6 +1,8 @@
 using System.Net;
 using ErsatzTV.Core.Networking;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc.Filters;
 
 namespace ErsatzTV.Authorization;
 
@@ -16,7 +18,8 @@ public class AdminAccessHandler : AuthorizationHandler<AdminAccessRequirement>
             return Task.CompletedTask;
         }
 
-        if (context.Resource is HttpContext httpContext &&
+        HttpContext httpContext = ResolveHttpContext(context);
+        if (httpContext is not null &&
             LocalIpExemption.IsExempt(httpContext.Connection.RemoteIpAddress))
         {
             context.Succeed(requirement);
@@ -24,4 +27,12 @@ public class AdminAccessHandler : AuthorizationHandler<AdminAccessRequirement>
 
         return Task.CompletedTask;
     }
+
+    private static HttpContext ResolveHttpContext(AuthorizationHandlerContext context) =>
+        context.Resource switch
+        {
+            HttpContext httpContext => httpContext,
+            AuthorizationFilterContext mvcContext => mvcContext.HttpContext,
+            _ => null
+        };
 }
