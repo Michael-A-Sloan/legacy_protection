@@ -99,23 +99,12 @@ public static class FileSystemLayout
             string customDatabasePath = Path.Combine(customConfigFolder, "ersatztv.sqlite3");
             string defaultDatabasePath = Path.Combine(defaultConfigFolder, "ersatztv.sqlite3");
 
-            if (File.Exists(customDatabasePath))
+            if (!File.Exists(customDatabasePath) && File.Exists(defaultDatabasePath))
             {
-                // Persisted /config volume with existing data - always use it.
-            }
-            else if (File.Exists(defaultDatabasePath))
-            {
-                Log.Logger.Warning(
-                    "Found config at legacy docker path {Default}; using it because {Folder} has no database yet. " +
-                    "Move the contents to {Folder} so updates keep your channels and libraries.",
-                    defaultConfigFolder,
-                    customConfigFolder,
-                    customConfigFolder);
-
-                useCustomConfigFolder = false;
+                TryMigrateDockerConfigFolder(defaultConfigFolder, customConfigFolder);
             }
 
-            // else: new install with an empty /config volume - use ETV_CONFIG_FOLDER
+            // Always use ETV_CONFIG_FOLDER in docker so host volume mounts are honored.
         }
 
         AppDataFolder = useCustomConfigFolder ? customConfigFolder : defaultConfigFolder;
@@ -207,5 +196,36 @@ public static class FileSystemLayout
 
         NextChannelConfigOverlaysFolder = Path.Combine(AppDataFolder, "next", "channel-config-overlays");
         NextPlayoutsFolder = Path.Combine(AppDataFolder, "next", "playouts");
+    }
+
+    private static void TryMigrateDockerConfigFolder(string legacyFolder, string targetFolder)
+    {
+        if (!Directory.Exists(legacyFolder) || !File.Exists(Path.Combine(legacyFolder, "ersatztv.sqlite3")))
+        {
+            return;
+        }
+
+        Log.Logger.Information(
+            "Migrating config data from legacy docker path {Legacy} to {Target}",
+            legacyFolder,
+            targetFolder);
+
+        try
+        {
+            if (Directory.Exists(targetFolder))
+            {
+                Directory.Delete(targetFolder, true);
+            }
+
+            Directory.Move(legacyFolder, targetFolder);
+        }
+        catch (Exception ex)
+        {
+            Log.Logger.Warning(
+                ex,
+                "Failed to migrate config data from {Legacy} to {Target}",
+                legacyFolder,
+                targetFolder);
+        }
     }
 }

@@ -61,6 +61,7 @@ public class StartTroubleshootingPlaybackHandler(
                     request.TroubleshootingInfo.Version,
                     Environment = request.TroubleshootingInfo.Environment.OrderBy(x => x.Key)
                         .ToDictionary(x => x.Key, x => x.Value),
+                    request.TroubleshootingInfo.FileSystem,
                     request.TroubleshootingInfo.Health,
                     request.TroubleshootingInfo.Cpus,
                     request.TroubleshootingInfo.VideoControllers,

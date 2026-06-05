@@ -517,6 +517,8 @@ public class Startup
             TvContext.CaseInsensitiveCollation = "utf8mb4_general_ci";
         }
 
+        Log.Logger.Information("Config folder is {Folder}", FileSystemLayout.AppDataFolder);
+        Log.Logger.Information("Logs folder is {Folder}", FileSystemLayout.LogsFolder);
         Log.Logger.Information("Transcode folder is {Folder}", FileSystemLayout.TranscodeFolder);
 
         services.AddMediatR(config => config.RegisterServicesFromAssemblyContaining<GetAllChannels>());

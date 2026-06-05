@@ -1,9 +1,9 @@
-using System.Collections;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using ErsatzTV.Application.FFmpegProfiles;
+using ErsatzTV.Core;
 using ErsatzTV.Core.Domain;
 using ErsatzTV.Core.FFmpeg;
 using ErsatzTV.Core.Health;
@@ -168,21 +168,16 @@ public class GetTroubleshootingInfoHandler : IRequestHandler<GetTroubleshootingI
             }
         }
 
-        var environment = new Dictionary<string, string>();
-        foreach (DictionaryEntry de in Environment.GetEnvironmentVariables())
-        {
-            if (de is { Key: string key, Value: string value })
-            {
-                if (key.StartsWith("ETV_", StringComparison.OrdinalIgnoreCase)
-                    || key.StartsWith("DOTNET_", StringComparison.OrdinalIgnoreCase)
-                    || key.StartsWith("ASPNETCORE_", StringComparison.OrdinalIgnoreCase)
-                    || key.Equals("PROVIDER", StringComparison.OrdinalIgnoreCase)
-                    || key.StartsWith("ELASTICSEARCH", StringComparison.OrdinalIgnoreCase))
-                {
-                    environment[key] = value;
-                }
-            }
-        }
+        Dictionary<string, string> environment = TroubleshootingEnvironmentSanitizer.CollectSanitizedEnvironmentVariables();
+
+        var fileSystem = new TroubleshootingFileSystemPaths(
+            FileSystemLayout.AppDataFolder,
+            FileSystemLayout.DatabasePath,
+            FileSystemLayout.LogsFolder,
+            FileSystemLayout.LogFilePath,
+            FileSystemLayout.TranscodeFolder,
+            File.Exists(FileSystemLayout.DatabasePath),
+            File.Exists(FileSystemLayout.LogFilePath));
 
         List<CpuModel> cpuList = _hardwareCapabilitiesFactory.GetCpuList();
         List<VideoControllerModel> videoControllerList = _hardwareCapabilitiesFactory.GetVideoControllerList();
@@ -190,6 +185,7 @@ public class GetTroubleshootingInfoHandler : IRequestHandler<GetTroubleshootingI
         return new TroubleshootingInfo(
             version,
             environment,
+            fileSystem,
             cpuList,
             videoControllerList,
             healthCheckSummaries,
