@@ -1,21 +1,26 @@
 ﻿using ErsatzTV.Core;
+using ErsatzTV.Core.Domain;
 using ErsatzTV.Core.Interfaces.Metadata;
+using ErsatzTV.Core.Interfaces.Repositories;
 using static ErsatzTV.Application.Logs.Mapper;
 
 namespace ErsatzTV.Application.Logs;
 
-public class GetRecentLogEntriesHandler : IRequestHandler<GetRecentLogEntries, PagedLogEntriesViewModel>
+public class GetRecentLogEntriesHandler(
+    ILocalFileSystem localFileSystem,
+    IConfigElementRepository configElementRepository)
+    : IRequestHandler<GetRecentLogEntries, PagedLogEntriesViewModel>
 {
-    private readonly ILocalFileSystem _localFileSystem;
-
-    public GetRecentLogEntriesHandler(ILocalFileSystem localFileSystem) => _localFileSystem = localFileSystem;
-
-    public Task<PagedLogEntriesViewModel> Handle(
+    public async Task<PagedLogEntriesViewModel> Handle(
         GetRecentLogEntries request,
         CancellationToken cancellationToken)
     {
+        bool showAdminSecurityLogs = await configElementRepository
+            .GetValue<bool>(ConfigElementKey.AdminSecurityLogsInSupportSectionEnabled, cancellationToken)
+            .IfNoneAsync(true);
+
         // get most recent file
-        string logFileName = _localFileSystem.ListFiles(FileSystemLayout.LogsFolder)
+        string logFileName = localFileSystem.ListFiles(FileSystemLayout.LogsFolder)
             .OrderDescending()
             .FirstOrDefault();
 
@@ -24,6 +29,11 @@ public class GetRecentLogEntriesHandler : IRequestHandler<GetRecentLogEntries, P
             IQueryable<LogEntryViewModel> entries = ReadFrom(logFileName)
                 .Bind(line => ProjectToViewModel(line))
                 .AsQueryable();
+
+            if (!showAdminSecurityLogs)
+            {
+                entries = entries.Where(le => !AdminSecurityLogMessages.IsAdminSecurityLogMessage(le.Message));
+            }
 
             if (!string.IsNullOrWhiteSpace(request.Filter))
             {
@@ -45,10 +55,10 @@ public class GetRecentLogEntriesHandler : IRequestHandler<GetRecentLogEntries, P
                 .Take(request.PageSize)
                 .ToList();
 
-            return new PagedLogEntriesViewModel(count, page).AsTask();
+            return new PagedLogEntriesViewModel(count, page);
         }
 
-        return new PagedLogEntriesViewModel(0, new List<LogEntryViewModel>()).AsTask();
+        return new PagedLogEntriesViewModel(0, new List<LogEntryViewModel>());
     }
 
     private static IEnumerable<string> ReadFrom(string file)

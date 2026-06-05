@@ -138,6 +138,9 @@
     <data name="ButtonSettingsUi" xml:space="preserve">
         <value>UI</value>
     </data>
+    <data name="ButtonSettingsLoginIp" xml:space="preserve">
+        <value>Login IP</value>
+    </data>
     <data name="ButtonSettingsXmltv" xml:space="preserve">
         <value>XMLTV</value>
     </data>

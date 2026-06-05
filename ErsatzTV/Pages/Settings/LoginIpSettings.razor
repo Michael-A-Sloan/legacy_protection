@@ -1,0 +1,380 @@
+@page "/settings/login-ip"
+@using System.Globalization
+@using ErsatzTV.Application.Configuration
+@using ErsatzTV.Application.Security
+@using ErsatzTV.Core.Domain
+@using ErsatzTV.Core.Domain.Security
+@implements IDisposable
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+@inject ILogger<LoginIpSettings> Logger
+
+<MudForm Style="max-height: 100%">
+    <MudPaper Square="true" Style="display: flex; height: 64px; min-height: 64px; width: 100%; z-index: 100; align-items: center">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(_ => SaveSettings())" Class="ml-6" StartIcon="@Icons.Material.Filled.Save">Save Settings</MudButton>
+    </MudPaper>
+    <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8">
+            <MudText Typo="Typo.h5" Class="mb-2">Login IP</MudText>
+            <MudText Typo="Typo.body2" Class="mb-4 mud-text-secondary">
+                Rate limit failed logins, ban or whitelist IP addresses, and review login attempts. IPTV streaming is not affected.
+                Local addresses (127.0.0.1, ::1, 0.0.0.0) are always exempt so library scans and other internal services keep working.
+            </MudText>
+            <MudDivider Class="mb-6"/>
+
+            <MudText Typo="Typo.h6" Class="mb-4">Rate Limiting</MudText>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <MudText>Enable Rate Limiting</MudText>
+                <MudSwitch @bind-Value="_settings.RateLimitEnabled" Color="Color.Primary"/>
+            </MudStack>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <MudText>Max Failed Attempts</MudText>
+                <MudNumericField @bind-Value="_settings.MaxFailedAttempts" Min="1" Max="100" Style="max-width: 200px"/>
+            </MudStack>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <MudText>Window (seconds)</MudText>
+                <MudNumericField @bind-Value="_settings.WindowSeconds" Min="60" Max="86400" Style="max-width: 200px"/>
+            </MudStack>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-8">
+                <MudText>Lockout (seconds)</MudText>
+                <MudNumericField @bind-Value="_settings.LockoutSeconds" Min="60" Max="86400" Style="max-width: 200px"/>
+            </MudStack>
+
+            <MudDivider Class="mb-6"/>
+            <MudText Typo="Typo.h6" Class="mb-4">Whitelist</MudText>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <MudText>Enable Whitelist</MudText>
+                <MudSwitch @bind-Value="_settings.WhitelistEnabled" Color="Color.Primary"/>
+            </MudStack>
+            <MudText Typo="Typo.body2" Class="mb-4 mud-text-secondary">
+                When enabled and at least one IP is listed, only whitelisted addresses can sign in.
+            </MudText>
+            <MudStack Row="true" Spacing="2" Class="mb-4">
+                <MudTextField @bind-Value="_newWhitelistIp" Label="IP Address" Style="max-width: 220px"/>
+                <MudTextField @bind-Value="_newWhitelistNote" Label="Note" Style="max-width: 280px"/>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(_ => AddRule(AdminIpRuleType.Whitelist))">Add to Whitelist</MudButton>
+            </MudStack>
+            <MudTable Items="@_whitelistRules" Dense="true" Class="mb-8">
+                <HeaderContent>
+                    <MudTh>IPv4</MudTh>
+                    <MudTh>IPv6</MudTh>
+                    <MudTh>Note</MudTh>
+                    <MudTh>Added</MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@FormatIp(context.IpAddressV4)</MudTd>
+                    <MudTd>@FormatIp(context.IpAddressV6)</MudTd>
+                    <MudTd>@context.Note</MudTd>
+                    <MudTd>@context.CreatedAt.ToLocalTime().ToString("g", _dtf)</MudTd>
+                    <MudTd>
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="@(_ => RemoveRule(context.Id))"/>
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText>No whitelisted IP addresses.</MudText>
+                </NoRecordsContent>
+            </MudTable>
+
+            <MudDivider Class="mb-6"/>
+            <MudText Typo="Typo.h6" Class="mb-4">Banned IPs</MudText>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <MudText>Enable Blacklist</MudText>
+                <MudSwitch @bind-Value="_settings.BlacklistEnabled" Color="Color.Primary"/>
+            </MudStack>
+            <MudStack Row="true" Spacing="2" Class="mb-4">
+                <MudTextField @bind-Value="_newBlacklistIp" Label="IP Address" Style="max-width: 220px"/>
+                <MudTextField @bind-Value="_newBlacklistNote" Label="Note" Style="max-width: 280px"/>
+                <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="@(_ => AddRule(AdminIpRuleType.Blacklist))">Ban IP</MudButton>
+            </MudStack>
+            <MudTable Items="@_blacklistRules" Dense="true" Class="mb-8">
+                <HeaderContent>
+                    <MudTh>IPv4</MudTh>
+                    <MudTh>IPv6</MudTh>
+                    <MudTh>Note</MudTh>
+                    <MudTh>Banned</MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@FormatIp(context.IpAddressV4)</MudTd>
+                    <MudTd>@FormatIp(context.IpAddressV6)</MudTd>
+                    <MudTd>@context.Note</MudTd>
+                    <MudTd>@context.CreatedAt.ToLocalTime().ToString("g", _dtf)</MudTd>
+                    <MudTd>
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(_ => Unban(context.IpAddress))">Unban</MudButton>
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText>No banned IP addresses.</MudText>
+                </NoRecordsContent>
+            </MudTable>
+
+            <MudDivider Class="mb-6"/>
+            <MudText Typo="Typo.h6" Class="mb-4">Login &amp; Access Attempts</MudText>
+            <MudText Typo="Typo.body2" Class="mb-4 mud-text-secondary">
+                Includes login form submissions, login page visits, and unauthenticated access to the admin UI.
+            </MudText>
+            <MudStack Row="true" Spacing="2" Class="mb-4">
+                <MudTextField @bind-Value="_searchString" Label="Search IP, username, path, or reason" Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"/>
+                <MudSelect T="AdminLoginAttemptKind?" @bind-Value="_attemptKindFilter" Label="Type" Style="max-width: 200px">
+                    <MudSelectItem T="AdminLoginAttemptKind?" Value="@((AdminLoginAttemptKind?)null)">All</MudSelectItem>
+                    <MudSelectItem T="AdminLoginAttemptKind?" Value="@AdminLoginAttemptKind.Login">Login</MudSelectItem>
+                    <MudSelectItem T="AdminLoginAttemptKind?" Value="@AdminLoginAttemptKind.LoginPage">Login Page</MudSelectItem>
+                    <MudSelectItem T="AdminLoginAttemptKind?" Value="@AdminLoginAttemptKind.AccessDenied">Access Denied</MudSelectItem>
+                </MudSelect>
+                <MudSelect T="bool?" @bind-Value="_successFilter" Label="Result" Style="max-width: 180px">
+                    <MudSelectItem T="bool?" Value="@((bool?)null)">All</MudSelectItem>
+                    <MudSelectItem T="bool?" Value="@true">Success</MudSelectItem>
+                    <MudSelectItem T="bool?" Value="@false">Failed</MudSelectItem>
+                </MudSelect>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@ReloadAttempts">Search</MudButton>
+            </MudStack>
+            <MudTable FixedHeader="true"
+                      @bind-RowsPerPage="@_rowsPerPage"
+                      ServerData="@(new Func<TableState, CancellationToken, Task<TableData<AdminLoginAttemptViewModel>>>(ServerReloadAttempts))"
+                      Dense="true"
+                      @ref="_attemptsTable">
+                <HeaderContent>
+                    <MudTh>
+                        <MudTableSortLabel T="AdminLoginAttemptViewModel" SortLabel="Timestamp">Timestamp</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel T="AdminLoginAttemptViewModel" SortLabel="IpAddressV4">IPv4</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel T="AdminLoginAttemptViewModel" SortLabel="IpAddressV6">IPv6</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel T="AdminLoginAttemptViewModel" SortLabel="AttemptKind">Type</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel T="AdminLoginAttemptViewModel" SortLabel="RequestPath">Path</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel T="AdminLoginAttemptViewModel" SortLabel="Username">Username</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel T="AdminLoginAttemptViewModel" SortLabel="Success">Result</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>Reason</MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Timestamp.ToLocalTime().ToString("G", _dtf)</MudTd>
+                    <MudTd>@FormatIp(context.IpAddressV4)</MudTd>
+                    <MudTd>@FormatIp(context.IpAddressV6)</MudTd>
+                    <MudTd>@FormatAttemptKind(context.AttemptKind)</MudTd>
+                    <MudTd>@FormatPath(context.RequestPath)</MudTd>
+                    <MudTd>@FormatUsername(context.Username)</MudTd>
+                    <MudTd>
+                        @if (context.AttemptKind == AdminLoginAttemptKind.LoginPage)
+                        {
+                            <MudChip T="string" Color="Color.Info" Size="Size.Small">View</MudChip>
+                        }
+                        else if (context.Success)
+                        {
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small">Success</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Color="Color.Error" Size="Size.Small">Failed</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd>@context.DenyReason</MudTd>
+                    <MudTd>
+                        @if (!IsBlacklisted(context.IpAddress))
+                        {
+                            <MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small"
+                                       OnClick="@(_ => BanFromAttempt(context.IpAddress))">Ban</MudButton>
+                        }
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText>No login attempts recorded yet.</MudText>
+                </NoRecordsContent>
+                <PagerContent>
+                    <MudTablePager/>
+                </PagerContent>
+            </MudTable>
+        </MudContainer>
+    </div>
+</MudForm>
+
+@code {
+    private CancellationTokenSource _cts;
+    private readonly DateTimeFormatInfo _dtf = CultureInfo.CurrentCulture.DateTimeFormat;
+
+    private LoginIpSettingsViewModel _settings = new();
+    private List<AdminIpRuleViewModel> _whitelistRules = [];
+    private List<AdminIpRuleViewModel> _blacklistRules = [];
+    private MudTable<AdminLoginAttemptViewModel> _attemptsTable;
+    private int _rowsPerPage = 10;
+    private string _searchString;
+    private bool? _successFilter;
+    private AdminLoginAttemptKind? _attemptKindFilter;
+    private string _newWhitelistIp;
+    private string _newWhitelistNote;
+    private string _newBlacklistIp;
+    private string _newBlacklistNote;
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+
+        try
+        {
+            _settings = await Mediator.Send(new GetLoginIpSettings(), token);
+            _rowsPerPage = await Mediator.Send(new GetConfigElementByKey(ConfigElementKey.LoginIpAttemptsPageSize), token)
+                .Map(maybeRows => maybeRows.Match(ce => int.TryParse(ce.Value, out int rows) ? rows : 10, () => 10));
+            await LoadRules(token);
+        }
+        catch (OperationCanceledException)
+        {
+            // do nothing
+        }
+    }
+
+    private async Task LoadRules(CancellationToken token)
+    {
+        _whitelistRules = await Mediator.Send(new GetAdminIpRules(AdminIpRuleType.Whitelist), token);
+        _blacklistRules = await Mediator.Send(new GetAdminIpRules(AdminIpRuleType.Blacklist), token);
+    }
+
+    private async Task SaveSettings()
+    {
+        Either<BaseError, Unit> result = await Mediator.Send(new UpdateLoginIpSettings(_settings), _cts.Token);
+        result.Match(
+            Left: error =>
+            {
+                Snackbar.Add(error.Value, Severity.Error);
+                Logger.LogError("Failed to save login IP settings: {Error}", error.Value);
+            },
+            Right: _ => Snackbar.Add("Successfully saved login IP settings", Severity.Success));
+    }
+
+    private async Task AddRule(AdminIpRuleType ruleType)
+    {
+        string ip = ruleType == AdminIpRuleType.Whitelist ? _newWhitelistIp : _newBlacklistIp;
+        string note = ruleType == AdminIpRuleType.Whitelist ? _newWhitelistNote : _newBlacklistNote;
+
+        Either<BaseError, Unit> result = await Mediator.Send(new AddAdminIpRule(ip, ruleType, note), _cts.Token);
+        if (result.IsLeft)
+        {
+            Snackbar.Add(result.LeftAsEnumerable().First().Value, Severity.Error);
+            return;
+        }
+
+        Snackbar.Add(ruleType == AdminIpRuleType.Whitelist ? "Added to whitelist" : "IP banned", Severity.Success);
+        if (ruleType == AdminIpRuleType.Whitelist)
+        {
+            _newWhitelistIp = string.Empty;
+            _newWhitelistNote = string.Empty;
+        }
+        else
+        {
+            _newBlacklistIp = string.Empty;
+            _newBlacklistNote = string.Empty;
+        }
+
+        await LoadRules(_cts.Token);
+    }
+
+    private async Task RemoveRule(int id)
+    {
+        Either<BaseError, Unit> result = await Mediator.Send(new RemoveAdminIpRule(id), _cts.Token);
+        if (result.IsLeft)
+        {
+            Snackbar.Add(result.LeftAsEnumerable().First().Value, Severity.Error);
+            return;
+        }
+
+        await LoadRules(_cts.Token);
+    }
+
+    private async Task Unban(string ipAddress)
+    {
+        Either<BaseError, Unit> result = await Mediator.Send(new UnbanIpAddress(ipAddress), _cts.Token);
+        if (result.IsLeft)
+        {
+            Snackbar.Add(result.LeftAsEnumerable().First().Value, Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("IP unbanned", Severity.Success);
+        await LoadRules(_cts.Token);
+    }
+
+    private async Task BanFromAttempt(string ipAddress)
+    {
+        Either<BaseError, Unit> result =
+            await Mediator.Send(new BanIpAddress(ipAddress, "Banned from login attempts"), _cts.Token);
+        if (result.IsLeft)
+        {
+            Snackbar.Add(result.LeftAsEnumerable().First().Value, Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("IP banned", Severity.Success);
+        await LoadRules(_cts.Token);
+    }
+
+    private bool IsBlacklisted(string ipAddress) =>
+        _blacklistRules.Any(r => string.Equals(r.IpAddress, ipAddress, StringComparison.OrdinalIgnoreCase));
+
+    private static string FormatIp(string ip) =>
+        string.IsNullOrWhiteSpace(ip) ? "—" : ip;
+
+    private static string FormatPath(string path) =>
+        string.IsNullOrWhiteSpace(path) ? "—" : path;
+
+    private static string FormatUsername(string username) =>
+        string.IsNullOrWhiteSpace(username) ? "—" : username;
+
+    private static string FormatAttemptKind(AdminLoginAttemptKind kind) =>
+        kind switch
+        {
+            AdminLoginAttemptKind.Login => "Login",
+            AdminLoginAttemptKind.LoginPage => "Login Page",
+            AdminLoginAttemptKind.AccessDenied => "Access Denied",
+            _ => kind.ToString()
+        };
+
+    private async Task ReloadAttempts()
+    {
+        if (_attemptsTable is not null)
+        {
+            await _attemptsTable.ReloadServerData();
+        }
+    }
+
+    private async Task<TableData<AdminLoginAttemptViewModel>> ServerReloadAttempts(
+        TableState state,
+        CancellationToken cancellationToken)
+    {
+        await Mediator.Send(
+            new SaveConfigElementByKey(ConfigElementKey.LoginIpAttemptsPageSize, state.PageSize.ToString()),
+            cancellationToken);
+
+        GetAdminLoginAttempts query = new(
+            state.Page,
+            state.PageSize,
+            _searchString,
+            _successFilter,
+            _attemptKindFilter,
+            state.SortLabel?.ToLowerInvariant() ?? "timestamp",
+            state.SortDirection == SortDirection.None || state.SortDirection == SortDirection.Descending);
+
+        PagedAdminLoginAttemptsViewModel data = await Mediator.Send(query, cancellationToken);
+        return new TableData<AdminLoginAttemptViewModel> { TotalItems = data.TotalCount, Items = data.Page };
+    }
+}

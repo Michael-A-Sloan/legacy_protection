@@ -12,6 +12,8 @@ public class ConfigElementKey
     public static ConfigElementKey MinimumLogLevelSearching => new("log.minimum_level.searching");
     public static ConfigElementKey MinimumLogLevelStreaming => new("log.minimum_level.streaming");
     public static ConfigElementKey MinimumLogLevelHttp => new("log.minimum_level.http");
+    public static ConfigElementKey AdminSecurityLogsInSupportSectionEnabled =>
+        new("log.admin_security.show_in_support_section");
     public static ConfigElementKey FFmpegPath => new("ffmpeg.ffmpeg_path");
     public static ConfigElementKey FFprobePath => new("ffmpeg.ffprobe_path");
     public static ConfigElementKey FFmpegDefaultProfileId => new("ffmpeg.default_profile_id");
@@ -60,4 +62,12 @@ public class ConfigElementKey
     public static ConfigElementKey XmltvTimeZone => new("xmltv.time_zone");
     public static ConfigElementKey XmltvDaysToBuild => new("xmltv.days_to_build");
     public static ConfigElementKey XmltvBlockBehavior => new("xmltv.block_behavior");
+
+    public static ConfigElementKey AdminLoginIpRateLimitEnabled => new("admin.login_ip.rate_limit_enabled");
+    public static ConfigElementKey AdminLoginIpMaxFailedAttempts => new("admin.login_ip.max_failed_attempts");
+    public static ConfigElementKey AdminLoginIpWindowSeconds => new("admin.login_ip.window_seconds");
+    public static ConfigElementKey AdminLoginIpLockoutSeconds => new("admin.login_ip.lockout_seconds");
+    public static ConfigElementKey AdminLoginIpWhitelistEnabled => new("admin.login_ip.whitelist_enabled");
+    public static ConfigElementKey AdminLoginIpBlacklistEnabled => new("admin.login_ip.blacklist_enabled");
+    public static ConfigElementKey LoginIpAttemptsPageSize => new("pages.login_ip_attempts.page_size");
 }

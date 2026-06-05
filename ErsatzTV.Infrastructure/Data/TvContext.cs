@@ -2,6 +2,7 @@ using System.Data;
 using ErsatzTV.Core.Domain;
 using ErsatzTV.Core.Domain.Filler;
 using ErsatzTV.Core.Domain.Scheduling;
+using ErsatzTV.Core.Domain.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -127,6 +128,8 @@ public class TvContext : DbContext
     public DbSet<FillerPreset> FillerPresets { get; set; }
     public DbSet<Subtitle> Subtitles { get; set; }
     public DbSet<GraphicsElement> GraphicsElements { get; set; }
+    public DbSet<AdminIpRule> AdminIpRules { get; set; }
+    public DbSet<AdminLoginAttempt> AdminLoginAttempts { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {

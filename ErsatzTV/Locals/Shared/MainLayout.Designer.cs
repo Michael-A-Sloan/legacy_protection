@@ -285,6 +285,12 @@ namespace ErsatzTV.Locals.Shared {
             }
         }
         
+        internal static string ButtonSettingsLoginIp {
+            get {
+                return ResourceManager.GetString("ButtonSettingsLoginIp", resourceCulture);
+            }
+        }
+        
         internal static string ButtonSettingsXmltv {
             get {
                 return ResourceManager.GetString("ButtonSettingsXmltv", resourceCulture);

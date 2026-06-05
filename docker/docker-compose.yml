@@ -7,6 +7,10 @@
                 INFO_VERSION: "docker-compose-develop"
         environment:
             TZ: America/Chicago
+            # Protect admin UI/API while keeping IPTV streaming public.
+            # Set a strong password before exposing port 8409 to your network.
+            ETV_ADMIN_USERNAME: admin
+            ETV_ADMIN_PASSWORD: changeme
         ports:
             - "8409:8409"
         volumes:

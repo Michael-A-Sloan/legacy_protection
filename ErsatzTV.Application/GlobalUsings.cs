@@ -1,4 +1,5 @@
-﻿global using LanguageExt;
+﻿global using ErsatzTV.Core;
+global using LanguageExt;
 global using MediatR;
 global using static LanguageExt.Prelude;
 global using Unit = LanguageExt.Unit;

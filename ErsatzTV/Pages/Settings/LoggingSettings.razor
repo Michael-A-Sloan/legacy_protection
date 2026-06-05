@@ -80,6 +80,17 @@
                     <MudSelectItem Value="@LogEventLevel.Error">Error</MudSelectItem>
                 </MudSelect>
             </MudStack>
+            <MudDivider Class="mb-6"/>
+            <MudText Typo="Typo.h6" Class="mb-4">Admin Security</MudText>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <div class="d-flex flex-column">
+                    <MudText>Show Admin Security Logs in Support Logs</MudText>
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                        Login and access events always appear in Settings → Login IP regardless of this setting.
+                    </MudText>
+                </div>
+                <MudSwitch @bind-Value="_loggingSettings.ShowAdminSecurityLogsInSupportSection" Color="Color.Primary"/>
+            </MudStack>
         </MudContainer>
     </div>
 </MudForm>

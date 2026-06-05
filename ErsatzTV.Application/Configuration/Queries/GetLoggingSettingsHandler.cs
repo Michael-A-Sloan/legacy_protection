@@ -41,6 +41,11 @@ public class GetLoggingSettingsHandler : IRequestHandler<GetLoggingSettings, Log
                 ConfigElementKey.MinimumLogLevelHttp,
                 cancellationToken);
 
+        Option<bool> maybeShowAdminSecurityLogs =
+            await _configElementRepository.GetValue<bool>(
+                ConfigElementKey.AdminSecurityLogsInSupportSectionEnabled,
+                cancellationToken);
+
         return new LoggingSettingsViewModel
         {
             DefaultMinimumLogLevel = await maybeDefaultLevel.IfNoneAsync(LogEventLevel.Information),
@@ -48,7 +53,8 @@ public class GetLoggingSettingsHandler : IRequestHandler<GetLoggingSettings, Log
             SchedulingMinimumLogLevel = await maybeSchedulingLevel.IfNoneAsync(LogEventLevel.Information),
             SearchingMinimumLogLevel = await maybeSearchingLevel.IfNoneAsync(LogEventLevel.Information),
             StreamingMinimumLogLevel = await maybeStreamingLevel.IfNoneAsync(LogEventLevel.Information),
-            HttpMinimumLogLevel = await maybeHttpLevel.IfNoneAsync(LogEventLevel.Information)
+            HttpMinimumLogLevel = await maybeHttpLevel.IfNoneAsync(LogEventLevel.Information),
+            ShowAdminSecurityLogsInSupportSection = await maybeShowAdminSecurityLogs.IfNoneAsync(true)
         };
     }
 }

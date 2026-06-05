@@ -27,6 +27,7 @@ using ErsatzTV.Core.Interfaces.Locking;
 using ErsatzTV.Core.Interfaces.Metadata;
 using ErsatzTV.Core.Interfaces.Plex;
 using ErsatzTV.Core.Interfaces.Repositories;
+using ErsatzTV.Core.Interfaces.Security;
 using ErsatzTV.Core.Interfaces.Scheduling;
 using ErsatzTV.Core.Interfaces.Scripting;
 using ErsatzTV.Core.Interfaces.Search;
@@ -47,8 +48,10 @@ using ErsatzTV.Core.Troubleshooting;
 using ErsatzTV.FFmpeg.Capabilities;
 using ErsatzTV.FFmpeg.Pipeline;
 using ErsatzTV.FFmpeg.Runtime;
+using ErsatzTV.Authorization;
 using ErsatzTV.Filters;
 using ErsatzTV.Formatters;
+using ErsatzTV.Middleware;
 using ErsatzTV.Infrastructure;
 using ErsatzTV.Infrastructure.Data;
 using ErsatzTV.Infrastructure.Data.Repositories;
@@ -66,6 +69,7 @@ using ErsatzTV.Infrastructure.Runtime;
 using ErsatzTV.Infrastructure.Scheduling;
 using ErsatzTV.Infrastructure.Scripting;
 using ErsatzTV.Infrastructure.Search;
+using ErsatzTV.Infrastructure.Security;
 using ErsatzTV.Infrastructure.Sqlite.Data;
 using ErsatzTV.Infrastructure.Streaming;
 using ErsatzTV.Infrastructure.Streaming.Graphics;
@@ -85,6 +89,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Localization;
+using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
@@ -162,7 +167,20 @@ public class Startup
 
         OidcHelper.Init(Configuration);
         JwtHelper.Init(Configuration);
+        AdminAuthHelper.Init(Configuration);
         SearchHelper.Init(Configuration);
+
+        if (AdminAuthHelper.IsEnabled)
+        {
+            Log.Logger.Information(
+                "Admin password protection enabled for UI and API. IPTV streaming remains public.");
+
+            if (string.Equals(AdminAuthHelper.Password, "changeme", StringComparison.Ordinal))
+            {
+                Log.Logger.Warning(
+                    "Admin password is still set to the default value. Change ETV_ADMIN_PASSWORD before exposing this server.");
+            }
+        }
 
         if (OidcHelper.IsEnabled)
         {
@@ -218,6 +236,26 @@ public class Startup
                         }
                     });
         }
+        else if (AdminAuthHelper.IsEnabled)
+        {
+            services.AddAuthentication(options =>
+                {
+                    options.DefaultScheme = "cookie";
+                    options.DefaultChallengeScheme = "cookie";
+                })
+                .AddCookie(
+                    "cookie",
+                    options =>
+                    {
+                        options.CookieManager = new ChunkingCookieManager();
+                        options.Cookie.HttpOnly = true;
+                        options.Cookie.SameSite = SameSiteMode.Lax;
+                        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+                        options.LoginPath = "/login";
+                        options.LogoutPath = "/account/logout";
+                        options.AccessDeniedPath = "/login";
+                    });
+        }
 
         if (JwtHelper.IsEnabled)
         {
@@ -249,19 +287,26 @@ public class Startup
                 });
         }
 
-        if (OidcHelper.IsEnabled || JwtHelper.IsEnabled)
+        if (AdminProtectionHelper.IsEnabled || JwtHelper.IsEnabled)
         {
             services.AddAuthorization(options =>
                 {
-                    if (OidcHelper.IsEnabled)
+                    if (AdminProtectionHelper.IsEnabled)
                     {
-                        var defaultAuthorizationPolicyBuilder = new AuthorizationPolicyBuilder(
-                            "cookie",
-                            "oidc");
+                        var defaultAuthorizationPolicyBuilder = new AuthorizationPolicyBuilder();
 
-                        defaultAuthorizationPolicyBuilder =
-                            defaultAuthorizationPolicyBuilder.RequireAuthenticatedUser();
+                        if (OidcHelper.IsEnabled)
+                        {
+                            defaultAuthorizationPolicyBuilder =
+                                defaultAuthorizationPolicyBuilder.AddAuthenticationSchemes("cookie", "oidc");
+                        }
+                        else
+                        {
+                            defaultAuthorizationPolicyBuilder =
+                                defaultAuthorizationPolicyBuilder.AddAuthenticationSchemes("cookie");
+                        }
 
+                        defaultAuthorizationPolicyBuilder.AddRequirements(new AdminAccessRequirement());
                         options.DefaultPolicy = defaultAuthorizationPolicyBuilder.Build();
                     }
 
@@ -276,6 +321,8 @@ public class Startup
                     }
                 }
             );
+
+            services.AddSingleton<IAuthorizationHandler, AdminAccessHandler>();
         }
 
         services.AddCors(o => o.AddPolicy(
@@ -296,6 +343,11 @@ public class Startup
                 options.OutputFormatters.Insert(0, new ChannelGuideOutputFormatter());
                 options.OutputFormatters.Insert(0, new DeviceXmlOutputFormatter());
                 options.OutputFormatters.Insert(0, new HdhrJsonOutputFormatter());
+
+                if (AdminProtectionHelper.IsEnabled)
+                {
+                    options.Filters.Add(new AuthorizeFilter());
+                }
             })
             .AddNewtonsoftJson(opt =>
             {
@@ -314,9 +366,10 @@ public class Startup
 
         services.AddRazorPages(options =>
         {
-            if (OidcHelper.IsEnabled)
+            if (AdminProtectionHelper.IsEnabled)
             {
                 options.Conventions.AuthorizeFolder("/");
+                options.Conventions.AllowAnonymousToPage("/Login");
             }
         });
 
@@ -637,17 +690,20 @@ public class Startup
             {
                 blazor.UseRouting();
 
-                if (OidcHelper.IsEnabled)
+                if (AdminProtectionHelper.IsEnabled)
                 {
                     blazor.UseAuthentication();
 #pragma warning disable ASP0001
                     blazor.UseAuthorization();
 #pragma warning restore ASP0001
+                    blazor.UseMiddleware<AdminAccessAttemptMiddleware>();
+                    blazor.UseMiddleware<AdminAccessLogMiddleware>();
                 }
 
                 blazor.UseEndpoints(endpoints =>
                 {
                     endpoints.MapControllers();
+                    endpoints.MapRazorPages();
                     endpoints.MapBlazorHub();
                     endpoints.MapFallbackToPage("/_Host");
 
@@ -760,6 +816,7 @@ public class Startup
         services.AddScoped<IMediaItemRepository, MediaItemRepository>();
         services.AddScoped<IMediaCollectionRepository, MediaCollectionRepository>();
         services.AddScoped<IConfigElementRepository, ConfigElementRepository>();
+        services.AddScoped<IAdminLoginProtectionService, AdminLoginProtectionService>();
         services.AddScoped<ITelevisionRepository, TelevisionRepository>();
         services.AddScoped<ISearchRepository, SearchRepository>();
         services.AddScoped<IMovieRepository, MovieRepository>();

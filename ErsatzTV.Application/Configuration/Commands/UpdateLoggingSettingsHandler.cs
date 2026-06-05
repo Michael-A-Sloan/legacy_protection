@@ -51,6 +51,11 @@ public class UpdateLoggingSettingsHandler : IRequestHandler<UpdateLoggingSetting
             loggingSettings.HttpMinimumLogLevel, cancellationToken);
         _loggingLevelSwitches.HttpLevelSwitch.MinimumLevel = loggingSettings.HttpMinimumLogLevel;
 
+        await _configElementRepository.Upsert(
+            ConfigElementKey.AdminSecurityLogsInSupportSectionEnabled,
+            loggingSettings.ShowAdminSecurityLogsInSupportSection,
+            cancellationToken);
+
         return Unit.Default;
     }
 }
