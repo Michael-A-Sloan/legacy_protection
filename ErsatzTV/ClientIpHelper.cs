@@ -41,4 +41,6 @@ public static class ClientIpHelper
     }
 
     public static bool IsExemptLocalAddress(string ipAddress) => LocalIpExemption.IsExempt(ipAddress);
+
+    public static bool IsProtectedAddress(string ipAddress) => ProtectedIpExemption.IsExempt(ipAddress);
 }

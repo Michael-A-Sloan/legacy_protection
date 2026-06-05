@@ -19,9 +19,10 @@ public class AddAdminIpRuleHandler(IDbContextFactory<TvContext> dbContextFactory
             return BaseError.New("IP address is required.");
         }
 
-        if (LocalIpExemption.IsExempt(ipAddress))
+        if (ProtectedIpExemption.IsExempt(ipAddress))
         {
-            return BaseError.New("Local addresses (127.0.0.1, ::1, 0.0.0.0) cannot be added to IP rules.");
+            return BaseError.New(
+                "Localhost, server network, and base URL IP addresses cannot be added to IP rules.");
         }
 
         IpAddressPair pair = IpAddressFormatting.FromString(ipAddress);

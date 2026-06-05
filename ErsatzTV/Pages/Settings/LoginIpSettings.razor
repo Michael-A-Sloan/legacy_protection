@@ -4,6 +4,7 @@
 @using ErsatzTV.Application.Security
 @using ErsatzTV.Core.Domain
 @using ErsatzTV.Core.Domain.Security
+@using ErsatzTV.Core.Networking
 @implements IDisposable
 @inject IMediator Mediator
 @inject ISnackbar Snackbar
@@ -18,7 +19,8 @@
             <MudText Typo="Typo.h5" Class="mb-2">Login IP</MudText>
             <MudText Typo="Typo.body2" Class="mb-4 mud-text-secondary">
                 Rate limit failed logins, ban or whitelist IP addresses, and review login attempts. IPTV streaming is not affected.
-                Local addresses (127.0.0.1, ::1, 0.0.0.0) are always exempt so library scans and other internal services keep working.
+                Localhost, this server's network addresses, and the IP configured in ETV_BASE_URL cannot be banned.
+                Local addresses (127.0.0.1, ::1, 0.0.0.0) are also always exempt so library scans and other internal services keep working.
             </MudText>
             <MudDivider Class="mb-6"/>
 
@@ -183,7 +185,7 @@
                     </MudTd>
                     <MudTd>@context.DenyReason</MudTd>
                     <MudTd>
-                        @if (!IsBlacklisted(context.IpAddress))
+                        @if (CanBan(context.IpAddress))
                         {
                             <MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small"
                                        OnClick="@(_ => BanFromAttempt(context.IpAddress))">Ban</MudButton>
@@ -330,6 +332,11 @@
 
     private bool IsBlacklisted(string ipAddress) =>
         _blacklistRules.Any(r => string.Equals(r.IpAddress, ipAddress, StringComparison.OrdinalIgnoreCase));
+
+    private bool CanBan(string ipAddress) =>
+        !string.IsNullOrWhiteSpace(ipAddress) &&
+        !IsBlacklisted(ipAddress) &&
+        !ProtectedIpExemption.IsExempt(ipAddress);
 
     private static string FormatIp(string ip) =>
         string.IsNullOrWhiteSpace(ip) ? "—" : ip;

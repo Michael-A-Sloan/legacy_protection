@@ -20,9 +20,7 @@ public class AdminLoginProtectionService(
         IpAddressPair clientIp,
         CancellationToken cancellationToken)
     {
-        if (LocalIpExemption.IsExempt(clientIp.Ipv4) ||
-            LocalIpExemption.IsExempt(clientIp.Ipv6) ||
-            LocalIpExemption.IsExempt(clientIp.Canonical))
+        if (ProtectedIpExemption.IsExempt(clientIp))
         {
             return new AdminLoginAccessResult(true, null);
         }
