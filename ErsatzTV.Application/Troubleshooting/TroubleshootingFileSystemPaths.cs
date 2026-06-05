@@ -4,6 +4,8 @@ public record TroubleshootingFileSystemPaths(
     string AppDataFolder,
     string LegacyAppDataFolder,
     string ConfigFolderEnv,
+    bool ConfigFolderMounted,
+    bool LegacyAppDataFolderMounted,
     string DatabasePath,
     string LogsFolder,
     string LogFilePath,

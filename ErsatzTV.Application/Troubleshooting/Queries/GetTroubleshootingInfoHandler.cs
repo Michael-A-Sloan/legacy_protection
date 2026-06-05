@@ -174,6 +174,8 @@ public class GetTroubleshootingInfoHandler : IRequestHandler<GetTroubleshootingI
             FileSystemLayout.AppDataFolder,
             FileSystemLayout.DefaultAppDataFolder,
             SystemEnvironment.ConfigFolder,
+            LinuxMountHelper.IsMountPoint(SystemEnvironment.ConfigFolder ?? string.Empty),
+            LinuxMountHelper.IsMountPoint(FileSystemLayout.DefaultAppDataFolder),
             FileSystemLayout.DatabasePath,
             FileSystemLayout.LogsFolder,
             FileSystemLayout.LogFilePath,

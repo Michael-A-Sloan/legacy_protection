@@ -16,7 +16,7 @@ public class AppDataFolderResolverTests
         Directory.CreateDirectory(custom);
         File.WriteAllText(Path.Combine(custom, AppDataFolderResolver.DatabaseFileName), "db");
 
-        AppDataFolderResolver.Resolve(legacy, custom).ShouldBe(custom);
+        AppDataFolderResolver.Resolve(legacy, custom, _ => false).ShouldBe(custom);
     }
 
     [Test]
@@ -28,7 +28,7 @@ public class AppDataFolderResolverTests
         Directory.CreateDirectory(legacy);
         File.WriteAllText(Path.Combine(legacy, AppDataFolderResolver.DatabaseFileName), "db");
 
-        AppDataFolderResolver.Resolve(legacy, custom).ShouldBe(legacy);
+        AppDataFolderResolver.Resolve(legacy, custom, _ => false).ShouldBe(legacy);
     }
 
     [Test]
@@ -38,7 +38,7 @@ public class AppDataFolderResolverTests
         string custom = Path.Combine(root, "config");
         string legacy = Path.Combine(root, "legacy");
 
-        AppDataFolderResolver.Resolve(legacy, custom).ShouldBe(custom);
+        AppDataFolderResolver.Resolve(legacy, custom, _ => false).ShouldBe(custom);
     }
 
     [Test]
@@ -47,7 +47,34 @@ public class AppDataFolderResolverTests
         string root = CreateTempRoot();
         string legacy = Path.Combine(root, "legacy");
 
-        AppDataFolderResolver.Resolve(legacy, null).ShouldBe(legacy);
+        AppDataFolderResolver.Resolve(legacy, null, _ => false).ShouldBe(legacy);
+    }
+
+    [Test]
+    public void Resolve_UsesMountedLegacyFolderForFreshInstall()
+    {
+        string root = CreateTempRoot();
+        string custom = Path.Combine(root, "config");
+        string legacy = Path.Combine(root, "legacy");
+        Directory.CreateDirectory(legacy);
+
+        AppDataFolderResolver.Resolve(legacy, custom, path => path == legacy).ShouldBe(legacy);
+    }
+
+    [Test]
+    public void Resolve_CopiesDatabaseToMountedCustomFolder()
+    {
+        string root = CreateTempRoot();
+        string custom = Path.Combine(root, "config");
+        string legacy = Path.Combine(root, "legacy");
+        Directory.CreateDirectory(legacy);
+        Directory.CreateDirectory(custom);
+        File.WriteAllText(Path.Combine(legacy, AppDataFolderResolver.DatabaseFileName), "db");
+
+        string resolved = AppDataFolderResolver.Resolve(legacy, custom, path => path == custom);
+
+        resolved.ShouldBe(custom);
+        File.Exists(Path.Combine(custom, AppDataFolderResolver.DatabaseFileName)).ShouldBeTrue();
     }
 
     private static string CreateTempRoot()
