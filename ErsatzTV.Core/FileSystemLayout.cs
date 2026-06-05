@@ -96,17 +96,26 @@ public static class FileSystemLayout
 
         if (useCustomConfigFolder && isDocker)
         {
-            // check for config at old location
-            if (Directory.Exists(defaultConfigFolder))
+            string customDatabasePath = Path.Combine(customConfigFolder, "ersatztv.sqlite3");
+            string defaultDatabasePath = Path.Combine(defaultConfigFolder, "ersatztv.sqlite3");
+
+            if (File.Exists(customDatabasePath))
+            {
+                // Persisted /config volume with existing data - always use it.
+            }
+            else if (File.Exists(defaultDatabasePath))
             {
                 Log.Logger.Warning(
-                    "Ignoring ETV_CONFIG_FOLDER {Folder} and using default {Default}",
+                    "Found config at legacy docker path {Default}; using it because {Folder} has no database yet. " +
+                    "Move the contents to {Folder} so updates keep your channels and libraries.",
+                    defaultConfigFolder,
                     customConfigFolder,
-                    defaultConfigFolder);
+                    customConfigFolder);
 
-                // ignore custom config folder
                 useCustomConfigFolder = false;
             }
+
+            // else: new install with an empty /config volume - use ETV_CONFIG_FOLDER
         }
 
         AppDataFolder = useCustomConfigFolder ? customConfigFolder : defaultConfigFolder;
