@@ -172,6 +172,8 @@ public class GetTroubleshootingInfoHandler : IRequestHandler<GetTroubleshootingI
 
         var fileSystem = new TroubleshootingFileSystemPaths(
             FileSystemLayout.AppDataFolder,
+            FileSystemLayout.DefaultAppDataFolder,
+            SystemEnvironment.ConfigFolder,
             FileSystemLayout.DatabasePath,
             FileSystemLayout.LogsFolder,
             FileSystemLayout.LogFilePath,

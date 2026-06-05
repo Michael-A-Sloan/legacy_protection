@@ -78,36 +78,25 @@ public static class FileSystemLayout
 
     public static readonly string MacOsOldDatabasePath = Path.Combine(MacOsOldAppDataFolder, "ersatztv.sqlite3");
 
+    public static readonly string DefaultAppDataFolder = Path.Combine(
+        Environment.GetFolderPath(
+            Environment.SpecialFolder.LocalApplicationData,
+            Environment.SpecialFolderOption.DoNotVerify),
+        "ersatztv");
+
     static FileSystemLayout()
     {
         string version = Assembly.GetEntryAssembly()?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
             ?.InformationalVersion ?? "unknown";
 
-        bool isDocker = version.Contains("docker", StringComparison.OrdinalIgnoreCase);
+        bool isDocker = version.Contains("docker", StringComparison.OrdinalIgnoreCase)
+                        || File.Exists("/.dockerenv");
 
-        string defaultConfigFolder = Path.Combine(
-            Environment.GetFolderPath(
-                Environment.SpecialFolder.LocalApplicationData,
-                Environment.SpecialFolderOption.DoNotVerify),
-            "ersatztv");
+        string defaultConfigFolder = DefaultAppDataFolder;
 
         string customConfigFolder = SystemEnvironment.ConfigFolder;
-        bool useCustomConfigFolder = !string.IsNullOrWhiteSpace(customConfigFolder);
 
-        if (useCustomConfigFolder && isDocker)
-        {
-            string customDatabasePath = Path.Combine(customConfigFolder, "ersatztv.sqlite3");
-            string defaultDatabasePath = Path.Combine(defaultConfigFolder, "ersatztv.sqlite3");
-
-            if (!File.Exists(customDatabasePath) && File.Exists(defaultDatabasePath))
-            {
-                TryMigrateDockerConfigFolder(defaultConfigFolder, customConfigFolder);
-            }
-
-            // Always use ETV_CONFIG_FOLDER in docker so host volume mounts are honored.
-        }
-
-        AppDataFolder = useCustomConfigFolder ? customConfigFolder : defaultConfigFolder;
+        AppDataFolder = AppDataFolderResolver.Resolve(defaultConfigFolder, customConfigFolder);
 
         string defaultTranscodeFolder = Path.Combine(
             Environment.GetFolderPath(
@@ -196,36 +185,5 @@ public static class FileSystemLayout
 
         NextChannelConfigOverlaysFolder = Path.Combine(AppDataFolder, "next", "channel-config-overlays");
         NextPlayoutsFolder = Path.Combine(AppDataFolder, "next", "playouts");
-    }
-
-    private static void TryMigrateDockerConfigFolder(string legacyFolder, string targetFolder)
-    {
-        if (!Directory.Exists(legacyFolder) || !File.Exists(Path.Combine(legacyFolder, "ersatztv.sqlite3")))
-        {
-            return;
-        }
-
-        Log.Logger.Information(
-            "Migrating config data from legacy docker path {Legacy} to {Target}",
-            legacyFolder,
-            targetFolder);
-
-        try
-        {
-            if (Directory.Exists(targetFolder))
-            {
-                Directory.Delete(targetFolder, true);
-            }
-
-            Directory.Move(legacyFolder, targetFolder);
-        }
-        catch (Exception ex)
-        {
-            Log.Logger.Warning(
-                ex,
-                "Failed to migrate config data from {Legacy} to {Target}",
-                legacyFolder,
-                targetFolder);
-        }
     }
 }
