@@ -8,4 +8,6 @@ public class LoginIpSettingsViewModel
     public int LockoutSeconds { get; set; } = 900;
     public bool WhitelistEnabled { get; set; }
     public bool BlacklistEnabled { get; set; } = true;
+    public bool GeolocationRequired { get; set; }
+    public bool GeolocationRequiredFromEnvironment { get; set; }
 }

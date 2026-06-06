@@ -77,7 +77,10 @@ public class GetAdminLoginAttemptsHandler(IDbContextFactory<TvContext> dbContext
             DenyReason = attempt.DenyReason,
             UserAgent = attempt.UserAgent,
             AttemptKind = attempt.AttemptKind,
-            RequestPath = attempt.RequestPath
+            RequestPath = attempt.RequestPath,
+            Latitude = attempt.Latitude,
+            Longitude = attempt.Longitude,
+            LocationAccuracyMeters = attempt.LocationAccuracyMeters
         };
     }
 

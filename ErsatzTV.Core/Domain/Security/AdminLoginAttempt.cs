@@ -13,4 +13,7 @@ public class AdminLoginAttempt
     public string UserAgent { get; set; }
     public AdminLoginAttemptKind AttemptKind { get; set; }
     public string RequestPath { get; set; }
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+    public double? LocationAccuracyMeters { get; set; }
 }

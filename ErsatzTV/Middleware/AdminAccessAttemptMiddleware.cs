@@ -53,7 +53,7 @@ public class AdminAccessAttemptMiddleware(
                 string.Empty,
                 AdminLoginAttemptKind.LoginPage,
                 path,
-                context.RequestAborted);
+                cancellationToken: context.RequestAborted);
 
             AdminSecurityLog.Information(
                 "Login page viewed from {RemoteIP}",
@@ -97,7 +97,7 @@ public class AdminAccessAttemptMiddleware(
             reason,
             AdminLoginAttemptKind.AccessDenied,
             path,
-            cancellationToken);
+            cancellationToken: cancellationToken);
 
         AdminSecurityLog.Warning(
             "Unauthenticated admin access from {RemoteIP} to {Path}",

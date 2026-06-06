@@ -69,5 +69,6 @@ public class ConfigElementKey
     public static ConfigElementKey AdminLoginIpLockoutSeconds => new("admin.login_ip.lockout_seconds");
     public static ConfigElementKey AdminLoginIpWhitelistEnabled => new("admin.login_ip.whitelist_enabled");
     public static ConfigElementKey AdminLoginIpBlacklistEnabled => new("admin.login_ip.blacklist_enabled");
+    public static ConfigElementKey AdminLoginGeolocationRequired => new("admin.login_ip.geolocation_required");
     public static ConfigElementKey LoginIpAttemptsPageSize => new("pages.login_ip_attempts.page_size");
 }

@@ -17,5 +17,8 @@ public interface IAdminLoginProtectionService
         string denyReason,
         AdminLoginAttemptKind attemptKind = AdminLoginAttemptKind.Login,
         string requestPath = "",
+        double? latitude = null,
+        double? longitude = null,
+        double? locationAccuracyMeters = null,
         CancellationToken cancellationToken = default);
 }

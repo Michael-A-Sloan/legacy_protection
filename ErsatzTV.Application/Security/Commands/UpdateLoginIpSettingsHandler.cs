@@ -1,5 +1,6 @@
 using ErsatzTV.Core.Domain;
 using ErsatzTV.Core.Interfaces.Repositories;
+using ErsatzTV.Core.Security;
 
 namespace ErsatzTV.Application.Security;
 
@@ -51,6 +52,14 @@ public class UpdateLoginIpSettingsHandler(IConfigElementRepository configElement
             ConfigElementKey.AdminLoginIpBlacklistEnabled,
             settings.BlacklistEnabled,
             cancellationToken);
+
+        if (!AdminLoginGeolocationSettings.IsRequiredFromEnvironment)
+        {
+            await configElementRepository.Upsert(
+                ConfigElementKey.AdminLoginGeolocationRequired,
+                settings.GeolocationRequired,
+                cancellationToken);
+        }
 
         return Unit.Default;
     }

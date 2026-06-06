@@ -82,6 +82,19 @@
             background: #00a000;
         }
 
+        button.secondary {
+            background: #424242;
+        }
+
+        button.secondary:hover {
+            background: #616161;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
         .error {
             margin-bottom: 1rem;
             padding: 0.75rem;
@@ -90,29 +103,113 @@
             color: #ff8a80;
             text-align: center;
         }
+
+        .hidden {
+            display: none;
+        }
     </style>
 </head>
 <body>
 <div class="login-card">
     <img src="images/ersatztv.png?v=2" alt="ErsatzTV"/>
     <h1>Admin Login</h1>
-    <p>Sign in to manage channels, libraries, and settings. IPTV streaming stays public.</p>
 
     @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
     {
         <div class="error">@Model.ErrorMessage</div>
     }
 
-    <form method="post" asp-page="/login">
-        <input type="hidden" asp-for="ReturnUrl"/>
-        <label for="username">Username</label>
-        <input id="username" asp-for="Username" autocomplete="username" required/>
+    @if (Model.RequireGeolocation)
+    {
+        <div id="location-gate">
+            <p>Browser location access is required before you can sign in. Your coordinates are recorded with login attempts.</p>
+            <button type="button" id="request-location" class="secondary">Allow Location Access</button>
+            <p id="location-status" class="hidden"></p>
+        </div>
+    }
 
-        <label for="password">Password</label>
-        <input id="password" asp-for="Password" type="password" autocomplete="current-password" required/>
+    <div id="login-panel" class="@(Model.RequireGeolocation ? "hidden" : string.Empty)">
+        <p>Sign in to manage channels, libraries, and settings. IPTV streaming stays public.</p>
 
-        <button type="submit">Sign In</button>
-    </form>
+        <form method="post" asp-page="/login" id="login-form">
+            <input type="hidden" asp-for="ReturnUrl"/>
+            <input type="hidden" asp-for="Latitude" id="latitude"/>
+            <input type="hidden" asp-for="Longitude" id="longitude"/>
+            <input type="hidden" asp-for="LocationAccuracyMeters" id="location-accuracy"/>
+
+            <label for="username">Username</label>
+            <input id="username" asp-for="Username" autocomplete="username" required/>
+
+            <label for="password">Password</label>
+            <input id="password" asp-for="Password" type="password" autocomplete="current-password" required/>
+
+            <button type="submit" id="sign-in-button">Sign In</button>
+        </form>
+    </div>
 </div>
+
+@if (Model.RequireGeolocation)
+{
+    <script>
+        (function () {
+            const gate = document.getElementById('location-gate');
+            const loginPanel = document.getElementById('login-panel');
+            const requestButton = document.getElementById('request-location');
+            const status = document.getElementById('location-status');
+            const latitudeInput = document.getElementById('latitude');
+            const longitudeInput = document.getElementById('longitude');
+            const accuracyInput = document.getElementById('location-accuracy');
+            const signInButton = document.getElementById('sign-in-button');
+
+            function showError(message) {
+                status.textContent = message;
+                status.className = 'error';
+                status.classList.remove('hidden');
+                requestButton.disabled = false;
+            }
+
+            function unlockLogin(position) {
+                latitudeInput.value = position.coords.latitude;
+                longitudeInput.value = position.coords.longitude;
+                accuracyInput.value = position.coords.accuracy;
+                gate.classList.add('hidden');
+                loginPanel.classList.remove('hidden');
+                signInButton.disabled = false;
+            }
+
+            if (!navigator.geolocation) {
+                showError('This browser does not support location access. Use HTTPS or a modern browser to sign in.');
+                return;
+            }
+
+            signInButton.disabled = true;
+
+            requestButton.addEventListener('click', function () {
+                requestButton.disabled = true;
+                status.classList.add('hidden');
+
+                navigator.geolocation.getCurrentPosition(
+                    unlockLogin,
+                    function (error) {
+                        let message = 'Location access is required to sign in.';
+                        if (error.code === error.PERMISSION_DENIED) {
+                            message = 'Location permission was denied. Allow location access for this site and try again.';
+                        } else if (error.code === error.POSITION_UNAVAILABLE) {
+                            message = 'Location is unavailable. Check your device settings and try again.';
+                        } else if (error.code === error.TIMEOUT) {
+                            message = 'Location request timed out. Try again.';
+                        }
+
+                        showError(message);
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 15000,
+                        maximumAge: 0
+                    });
+            });
+        })();
+    </script>
+}
 </body>
 </html>

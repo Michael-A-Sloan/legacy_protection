@@ -72,6 +72,9 @@ public class AdminLoginProtectionService(
         string denyReason,
         AdminLoginAttemptKind attemptKind = AdminLoginAttemptKind.Login,
         string requestPath = "",
+        double? latitude = null,
+        double? longitude = null,
+        double? locationAccuracyMeters = null,
         CancellationToken cancellationToken = default)
     {
         await using TvContext dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
@@ -88,7 +91,10 @@ public class AdminLoginProtectionService(
                 DenyReason = denyReason ?? string.Empty,
                 UserAgent = userAgent ?? string.Empty,
                 AttemptKind = attemptKind,
-                RequestPath = requestPath ?? string.Empty
+                RequestPath = requestPath ?? string.Empty,
+                Latitude = latitude,
+                Longitude = longitude,
+                LocationAccuracyMeters = locationAccuracyMeters
             });
 
         await dbContext.SaveChangesAsync(cancellationToken);

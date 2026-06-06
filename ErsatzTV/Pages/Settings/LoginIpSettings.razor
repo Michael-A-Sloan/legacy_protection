@@ -5,6 +5,7 @@
 @using ErsatzTV.Core.Domain
 @using ErsatzTV.Core.Domain.Security
 @using ErsatzTV.Core.Networking
+@using ErsatzTV.Core.Security
 @implements IDisposable
 @inject IMediator Mediator
 @inject ISnackbar Snackbar
@@ -41,6 +42,23 @@
                 <MudText>Lockout (seconds)</MudText>
                 <MudNumericField @bind-Value="_settings.LockoutSeconds" Min="60" Max="86400" Style="max-width: 200px"/>
             </MudStack>
+
+            <MudDivider Class="mb-6"/>
+            <MudText Typo="Typo.h6" Class="mb-4">Browser Location</MudText>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <MudText>Require Location on Login Page</MudText>
+                <MudSwitch @bind-Value="_settings.GeolocationRequired"
+                           Color="Color.Primary"
+                           Disabled="_settings.GeolocationRequiredFromEnvironment"/>
+            </MudStack>
+            <MudText Typo="Typo.body2" Class="mb-8 mud-text-secondary">
+                When enabled, the browser must grant location access before the login form appears.
+                Coordinates are stored with login attempts. Most browsers require HTTPS for location access.
+                @if (_settings.GeolocationRequiredFromEnvironment)
+                {
+                    <span> This setting is forced on by ETV_LOGIN_GEOLOCATION_REQUIRED.</span>
+                }
+            </MudText>
 
             <MudDivider Class="mb-6"/>
             <MudText Typo="Typo.h6" Class="mb-4">Whitelist</MudText>
@@ -156,6 +174,7 @@
                     <MudTh>
                         <MudTableSortLabel T="AdminLoginAttemptViewModel" SortLabel="Username">Username</MudTableSortLabel>
                     </MudTh>
+                    <MudTh>Location</MudTh>
                     <MudTh>
                         <MudTableSortLabel T="AdminLoginAttemptViewModel" SortLabel="Success">Result</MudTableSortLabel>
                     </MudTh>
@@ -169,6 +188,19 @@
                     <MudTd>@FormatAttemptKind(context.AttemptKind)</MudTd>
                     <MudTd>@FormatPath(context.RequestPath)</MudTd>
                     <MudTd>@FormatUsername(context.Username)</MudTd>
+                    <MudTd>
+                        @if (context.Latitude.HasValue && context.Longitude.HasValue)
+                        {
+                            <MudLink Href="@AdminLoginGeolocationHelper.BuildMapsUrl(context.Latitude, context.Longitude)"
+                                     Target="_blank">
+                                @AdminLoginGeolocationHelper.FormatDisplay(context.Latitude, context.Longitude)
+                            </MudLink>
+                        }
+                        else
+                        {
+                            @("—")
+                        }
+                    </MudTd>
                     <MudTd>
                         @if (context.AttemptKind == AdminLoginAttemptKind.LoginPage)
                         {
