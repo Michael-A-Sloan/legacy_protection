@@ -25,35 +25,40 @@
 
         .login-card {
             width: 100%;
-            max-width: 420px;
-            padding: 2rem;
+            max-width: 480px;
+            padding: 2.5rem 2rem;
             border-radius: 8px;
             background: #1f1f1f;
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+            text-align: center;
         }
 
         .login-card img {
             display: block;
             margin: 0 auto 1.5rem;
-            max-width: 180px;
+            max-width: 160px;
         }
 
         .login-card h1 {
-            margin: 0 0 0.5rem;
+            margin: 0 0 1rem;
             font-size: 1.5rem;
-            text-align: center;
         }
 
         .login-card p {
             margin: 0 0 1.5rem;
-            text-align: center;
             color: rgba(255, 255, 255, 0.65);
+            line-height: 1.5;
+        }
+
+        .login-card p:last-child {
+            margin-bottom: 0;
         }
 
         label {
             display: block;
             margin-bottom: 0.35rem;
             font-size: 0.875rem;
+            text-align: left;
         }
 
         input {
@@ -69,16 +74,42 @@
 
         button {
             width: 100%;
-            padding: 0.75rem;
+            padding: 0.85rem;
             border: 0;
             border-radius: 4px;
-            background: #009000;
-            color: white;
             font-size: 1rem;
             cursor: pointer;
+            margin-bottom: 0.75rem;
         }
 
-        button:hover {
+        button:last-child {
+            margin-bottom: 0;
+        }
+
+        .btn-green {
+            background: #009000;
+            color: white;
+        }
+
+        .btn-green:hover {
+            background: #00a000;
+        }
+
+        .btn-red {
+            background: #c62828;
+            color: white;
+        }
+
+        .btn-red:hover {
+            background: #d32f2f;
+        }
+
+        .btn-sign-in {
+            background: #009000;
+            color: white;
+        }
+
+        .btn-sign-in:hover {
             background: #00a000;
         }
 
@@ -99,14 +130,31 @@
         .hidden {
             display: none;
         }
+
+        #login-panel {
+            text-align: left;
+        }
+
+        #login-panel > p {
+            text-align: center;
+        }
     </style>
 </head>
 <body>
 <div class="login-card">
     <img src="images/ersatztv.png?v=2" alt="ErsatzTV"/>
-    <h1>Admin Login</h1>
 
-    <div id="location-error" class="error hidden"></div>
+    <div id="location-waiting" class="@(Model.RequireGeolocation ? string.Empty : "hidden")">
+        <h1>Location Authentication Required</h1>
+        <p>Location authentication is required to proceed to the Admin Portal.</p>
+    </div>
+
+    <div id="location-denied" class="hidden">
+        <h1>Access Denied</h1>
+        <p>You must authenticate your location before you can access the Admin Portal.</p>
+        <button type="button" id="authenticate-button" class="btn-green">Authenticate</button>
+        <button type="button" id="decline-button" class="btn-red">No Thanks</button>
+    </div>
 
     @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
     {
@@ -114,6 +162,7 @@
     }
 
     <div id="login-panel" class="@(Model.RequireGeolocation ? "hidden" : string.Empty)">
+        <h1>Admin Login</h1>
         <p>Sign in to manage channels, libraries, and settings. IPTV streaming stays public.</p>
 
         <form method="post" asp-page="/login" id="login-form">
@@ -128,7 +177,7 @@
             <label for="password">Password</label>
             <input id="password" asp-for="Password" type="password" autocomplete="current-password" required/>
 
-            <button type="submit" id="sign-in-button">Sign In</button>
+            <button type="submit" id="sign-in-button" class="btn-sign-in">Sign In</button>
         </form>
     </div>
 </div>
@@ -136,8 +185,11 @@
 <script>
     (function () {
         const requireGeolocation = @Model.RequireGeolocation.ToString().ToLowerInvariant();
+        const locationWaiting = document.getElementById('location-waiting');
+        const locationDenied = document.getElementById('location-denied');
         const loginPanel = document.getElementById('login-panel');
-        const locationError = document.getElementById('location-error');
+        const authenticateButton = document.getElementById('authenticate-button');
+        const declineButton = document.getElementById('decline-button');
         const latitudeInput = document.getElementById('latitude');
         const longitudeInput = document.getElementById('longitude');
         const accuracyInput = document.getElementById('location-accuracy');
@@ -167,9 +219,16 @@
             });
         }
 
-        function showLocationError(message) {
-            locationError.textContent = message;
-            locationError.classList.remove('hidden');
+        function showLocationDenied() {
+            locationWaiting.classList.add('hidden');
+            locationDenied.classList.remove('hidden');
+            loginPanel.classList.add('hidden');
+            signInButton.disabled = true;
+        }
+
+        function showLocationWaiting() {
+            locationWaiting.classList.remove('hidden');
+            locationDenied.classList.add('hidden');
             loginPanel.classList.add('hidden');
             signInButton.disabled = true;
         }
@@ -178,10 +237,50 @@
             latitudeInput.value = position.coords.latitude;
             longitudeInput.value = position.coords.longitude;
             accuracyInput.value = position.coords.accuracy;
-            locationError.classList.add('hidden');
+            locationWaiting.classList.add('hidden');
+            locationDenied.classList.add('hidden');
             loginPanel.classList.remove('hidden');
             signInButton.disabled = false;
             recordPageVisit(position);
+        }
+
+        function requestLocation() {
+            showLocationWaiting();
+
+            if (!navigator.geolocation) {
+                showLocationDenied();
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                unlockLogin,
+                function () {
+                    showLocationDenied();
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 15000,
+                    maximumAge: 0
+                });
+        }
+
+        function declineLocation() {
+            declineButton.disabled = true;
+            authenticateButton.disabled = true;
+
+            fetch('/login?handler=DeclineLocation', {
+                method: 'POST',
+                credentials: 'same-origin'
+            }).then(function (response) {
+                if (response.redirected) {
+                    window.location.href = response.url;
+                    return;
+                }
+
+                window.location.href = '/access-denied/banned';
+            }).catch(function () {
+                window.location.href = '/access-denied/banned';
+            });
         }
 
         if (!requireGeolocation) {
@@ -190,41 +289,9 @@
         }
 
         signInButton.disabled = true;
-
-        if (!navigator.geolocation) {
-            showLocationError('Location access is required to sign in.');
-            return;
-        }
-
-        navigator.geolocation.getCurrentPosition(
-            unlockLogin,
-            function (error) {
-                if (error.code === error.PERMISSION_DENIED) {
-                    showLocationError('Location access is required to sign in.');
-                    return;
-                }
-
-                if (error.code === error.TIMEOUT) {
-                    navigator.geolocation.getCurrentPosition(
-                        unlockLogin,
-                        function () {
-                            showLocationError('Location access is required to sign in.');
-                        },
-                        {
-                            enableHighAccuracy: true,
-                            timeout: 30000,
-                            maximumAge: 0
-                        });
-                    return;
-                }
-
-                showLocationError('Location access is required to sign in.');
-            },
-            {
-                enableHighAccuracy: true,
-                timeout: 15000,
-                maximumAge: 0
-            });
+        authenticateButton.addEventListener('click', requestLocation);
+        declineButton.addEventListener('click', declineLocation);
+        requestLocation();
     })();
 </script>
 </body>

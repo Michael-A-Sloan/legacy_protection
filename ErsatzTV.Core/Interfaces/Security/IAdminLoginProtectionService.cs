@@ -7,6 +7,8 @@ public record AdminLoginAccessResult(bool Allowed, string DenyReason);
 
 public interface IAdminLoginProtectionService
 {
+    Task<bool> IsIpBannedAsync(IpAddressPair clientIp, CancellationToken cancellationToken);
+
     Task<AdminLoginAccessResult> CheckAccessAsync(IpAddressPair clientIp, CancellationToken cancellationToken);
 
     Task RecordAttemptAsync(

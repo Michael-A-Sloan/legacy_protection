@@ -18,6 +18,22 @@ public class AdminLoginProtectionService(
     private const int DefaultWindowSeconds = 300;
     private const int DefaultLockoutSeconds = 900;
 
+    public async Task<bool> IsIpBannedAsync(IpAddressPair clientIp, CancellationToken cancellationToken)
+    {
+        if (ProtectedIpExemption.IsExempt(clientIp))
+        {
+            return false;
+        }
+
+        LoginIpSettings settings = await GetSettings(cancellationToken);
+        if (!settings.BlacklistEnabled)
+        {
+            return false;
+        }
+
+        return await IsIpInRules(clientIp, AdminIpRuleType.Blacklist, cancellationToken);
+    }
+
     public async Task<AdminLoginAccessResult> CheckAccessAsync(
         IpAddressPair clientIp,
         CancellationToken cancellationToken)

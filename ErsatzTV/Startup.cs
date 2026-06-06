@@ -409,6 +409,7 @@ public class Startup
             {
                 options.Conventions.AuthorizeFolder("/");
                 options.Conventions.AllowAnonymousToPage("/Login");
+                options.Conventions.AllowAnonymousToPage("/AccessDenied/Banned");
             }
         });
 
@@ -751,6 +752,7 @@ public class Startup
 
                 if (AdminProtectionHelper.IsEnabled)
                 {
+                    blazor.UseMiddleware<BannedIpBlockMiddleware>();
                     blazor.UseMiddleware<VpnBlockMiddleware>();
                     blazor.UseAuthentication();
 #pragma warning disable ASP0001

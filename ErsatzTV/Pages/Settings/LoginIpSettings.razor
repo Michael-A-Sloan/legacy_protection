@@ -246,7 +246,20 @@
                     <MudSelectItem T="bool?" Value="@false">Failed</MudSelectItem>
                 </MudSelect>
                 <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@ReloadAttempts">Search</MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="@(_ => _showClearLogConfirm = true)">Clear Log</MudButton>
             </MudStack>
+            @if (_showClearLogConfirm)
+            {
+                <MudAlert Severity="Severity.Warning" Class="mb-4" Variant="Variant.Outlined">
+                    <MudText Typo="Typo.body2" Class="mb-3">
+                        Permanently delete all entries in Login &amp; Access Attempts? Banned IP activity is not affected.
+                    </MudText>
+                    <MudStack Row="true" Spacing="2">
+                        <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="@ClearAttemptsLog">Confirm Clear</MudButton>
+                        <MudButton Variant="Variant.Outlined" OnClick="@(_ => _showClearLogConfirm = false)">Cancel</MudButton>
+                    </MudStack>
+                </MudAlert>
+            }
             <MudTable FixedHeader="true"
                       @bind-RowsPerPage="@_rowsPerPage"
                       ServerData="@(new Func<TableState, CancellationToken, Task<TableData<AdminLoginAttemptViewModel>>>(ServerReloadAttempts))"
@@ -345,6 +358,7 @@
     private int _bannedRowsPerPage = 10;
     private string _searchString;
     private string _bannedIpFilter;
+    private bool _showClearLogConfirm;
     private bool? _successFilter;
     private AdminLoginAttemptKind? _attemptKindFilter;
     private string _newWhitelistIp;
@@ -518,6 +532,26 @@
         {
             await _attemptsTable.ReloadServerData();
         }
+    }
+
+    private async Task ClearAttemptsLog()
+    {
+        Either<BaseError, int> result =
+            await Mediator.Send(new ClearAdminLoginAttempts(LoginAttemptScope.Active), _cts.Token);
+
+        _showClearLogConfirm = false;
+
+        if (result.IsLeft)
+        {
+            Snackbar.Add(result.LeftAsEnumerable().First().Value, Severity.Error);
+            return;
+        }
+
+        int deleted = result.RightToSeq().First();
+        Snackbar.Add(
+            deleted == 0 ? "Login log is already empty." : $"Cleared {deleted} log entries.",
+            Severity.Success);
+        await ReloadAttempts();
     }
 
     private async Task<TableData<AdminLoginAttemptViewModel>> ServerReloadAttempts(

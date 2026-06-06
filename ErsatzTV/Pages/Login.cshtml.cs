@@ -1,9 +1,12 @@
 using System.Security.Claims;
+using ErsatzTV.Application.Security;
+using ErsatzTV.Core;
 using ErsatzTV.Core.Domain.Security;
 using ErsatzTV.Core.Interfaces.Repositories;
 using ErsatzTV.Core.Interfaces.Security;
 using ErsatzTV.Core.Networking;
 using ErsatzTV.Core.Security;
+using MediatR;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,7 +17,8 @@ namespace ErsatzTV.Pages;
 [AllowAnonymous]
 public class LoginModel(
     IAdminLoginProtectionService loginProtectionService,
-    IConfigElementRepository configElementRepository) : PageModel
+    IConfigElementRepository configElementRepository,
+    IMediator mediator) : PageModel
 {
     [BindProperty]
     public string Username { get; set; }
@@ -45,6 +49,12 @@ public class LoginModel(
             return Redirect("/");
         }
 
+        IpAddressPair clientIp = ClientIpHelper.GetClientIpInfo(HttpContext);
+        if (await loginProtectionService.IsIpBannedAsync(clientIp, cancellationToken))
+        {
+            return RedirectToPage("/AccessDenied/Banned");
+        }
+
         RequireGeolocation =
             await AdminLoginGeolocationSettings.IsRequiredAsync(configElementRepository, cancellationToken);
 
@@ -67,6 +77,11 @@ public class LoginModel(
         if (ProtectedIpExemption.IsExempt(clientIp))
         {
             return new OkResult();
+        }
+
+        if (await loginProtectionService.IsIpBannedAsync(clientIp, cancellationToken))
+        {
+            return new UnauthorizedResult();
         }
 
         string userAgent = Request.Headers.UserAgent.ToString();
@@ -93,6 +108,51 @@ public class LoginModel(
         return new OkResult();
     }
 
+    public async Task<IActionResult> OnPostDeclineLocationAsync(CancellationToken cancellationToken)
+    {
+        if (!AdminAuthHelper.IsEnabled)
+        {
+            return Redirect("/");
+        }
+
+        IpAddressPair clientIp = ClientIpHelper.GetClientIpInfo(HttpContext);
+        string userAgent = Request.Headers.UserAgent.ToString();
+        string path = Request.Path.Value ?? "/login";
+
+        await loginProtectionService.RecordAttemptAsync(
+            clientIp,
+            string.Empty,
+            false,
+            userAgent,
+            "Declined location authentication on login page.",
+            AdminLoginAttemptKind.LoginPage,
+            path,
+            cancellationToken: cancellationToken);
+
+        if (ProtectedIpExemption.IsExempt(clientIp))
+        {
+            AdminSecurityLog.Warning(
+                "Protected IP {RemoteIP} attempted to decline location authentication",
+                clientIp.Display);
+            return RedirectToPage("/AccessDenied/Banned");
+        }
+
+        Either<BaseError, Unit> banResult = await mediator.Send(
+            new BanIpAddress(clientIp.Canonical, "Declined location authentication on login page"),
+            cancellationToken);
+
+        banResult.Match(
+            Left: error => AdminSecurityLog.Warning(
+                "Failed to ban IP {RemoteIP} after location decline: {Error}",
+                clientIp.Display,
+                error.Value),
+            Right: _ => AdminSecurityLog.Warning(
+                "IP {RemoteIP} banned after declining location authentication",
+                clientIp.Display));
+
+        return RedirectToPage("/AccessDenied/Banned");
+    }
+
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
         if (!AdminAuthHelper.IsEnabled)
@@ -100,10 +160,15 @@ public class LoginModel(
             return Redirect("/");
         }
 
+        IpAddressPair clientIp = ClientIpHelper.GetClientIpInfo(HttpContext);
+        if (await loginProtectionService.IsIpBannedAsync(clientIp, cancellationToken))
+        {
+            return RedirectToPage("/AccessDenied/Banned");
+        }
+
         RequireGeolocation =
             await AdminLoginGeolocationSettings.IsRequiredAsync(configElementRepository, cancellationToken);
 
-        IpAddressPair clientIp = ClientIpHelper.GetClientIpInfo(HttpContext);
         string userAgent = Request.Headers.UserAgent.ToString();
 
         if (RequireGeolocation && !AdminLoginGeolocationHelper.TryValidate(Latitude, Longitude, out string geoError))
@@ -144,6 +209,11 @@ public class LoginModel(
                 Username ?? "(empty)",
                 clientIp.Display,
                 accessResult.DenyReason);
+
+            if (accessResult.DenyReason?.Contains("banned", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                return RedirectToPage("/AccessDenied/Banned");
+            }
 
             ErrorMessage = accessResult.DenyReason;
             return Page();
