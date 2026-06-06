@@ -122,7 +122,7 @@
     @if (Model.RequireGeolocation)
     {
         <div id="location-gate">
-            <p>Browser location access is required before you can sign in. Your coordinates are recorded with login attempts.</p>
+            <p>Browser location access is required before you can sign in. Visits and login attempts are recorded with your coordinates when available.</p>
             <button type="button" id="request-location" class="secondary">Allow Location Access</button>
             <p id="location-status" class="hidden"></p>
         </div>
@@ -148,68 +148,96 @@
     </div>
 </div>
 
-@if (Model.RequireGeolocation)
-{
-    <script>
-        (function () {
-            const gate = document.getElementById('location-gate');
-            const loginPanel = document.getElementById('login-panel');
-            const requestButton = document.getElementById('request-location');
-            const status = document.getElementById('location-status');
-            const latitudeInput = document.getElementById('latitude');
-            const longitudeInput = document.getElementById('longitude');
-            const accuracyInput = document.getElementById('location-accuracy');
-            const signInButton = document.getElementById('sign-in-button');
+<script>
+    (function () {
+        const requireGeolocation = @Model.RequireGeolocation.ToString().ToLowerInvariant();
+        const gate = document.getElementById('location-gate');
+        const loginPanel = document.getElementById('login-panel');
+        const requestButton = document.getElementById('request-location');
+        const status = document.getElementById('location-status');
+        const latitudeInput = document.getElementById('latitude');
+        const longitudeInput = document.getElementById('longitude');
+        const accuracyInput = document.getElementById('location-accuracy');
+        const signInButton = document.getElementById('sign-in-button');
+        let pageVisitRecorded = false;
 
-            function showError(message) {
-                status.textContent = message;
-                status.className = 'error';
-                status.classList.remove('hidden');
-                requestButton.disabled = false;
-            }
-
-            function unlockLogin(position) {
-                latitudeInput.value = position.coords.latitude;
-                longitudeInput.value = position.coords.longitude;
-                accuracyInput.value = position.coords.accuracy;
-                gate.classList.add('hidden');
-                loginPanel.classList.remove('hidden');
-                signInButton.disabled = false;
-            }
-
-            if (!navigator.geolocation) {
-                showError('This browser does not support location access. Use HTTPS or a modern browser to sign in.');
+        function recordPageVisit(position) {
+            if (pageVisitRecorded) {
                 return;
             }
 
-            signInButton.disabled = true;
+            pageVisitRecorded = true;
 
-            requestButton.addEventListener('click', function () {
-                requestButton.disabled = true;
-                status.classList.add('hidden');
+            const formData = new FormData();
+            if (position) {
+                formData.append('Latitude', position.coords.latitude);
+                formData.append('Longitude', position.coords.longitude);
+                formData.append('LocationAccuracyMeters', position.coords.accuracy);
+            }
 
-                navigator.geolocation.getCurrentPosition(
-                    unlockLogin,
-                    function (error) {
-                        let message = 'Location access is required to sign in.';
-                        if (error.code === error.PERMISSION_DENIED) {
-                            message = 'Location permission was denied. Allow location access for this site and try again.';
-                        } else if (error.code === error.POSITION_UNAVAILABLE) {
-                            message = 'Location is unavailable. Check your device settings and try again.';
-                        } else if (error.code === error.TIMEOUT) {
-                            message = 'Location request timed out. Try again.';
-                        }
-
-                        showError(message);
-                    },
-                    {
-                        enableHighAccuracy: true,
-                        timeout: 15000,
-                        maximumAge: 0
-                    });
+            fetch('/login?handler=PageVisit', {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin'
+            }).catch(function () {
+                pageVisitRecorded = false;
             });
-        })();
-    </script>
-}
+        }
+
+        function showError(message) {
+            status.textContent = message;
+            status.className = 'error';
+            status.classList.remove('hidden');
+            requestButton.disabled = false;
+        }
+
+        function unlockLogin(position) {
+            latitudeInput.value = position.coords.latitude;
+            longitudeInput.value = position.coords.longitude;
+            accuracyInput.value = position.coords.accuracy;
+            gate.classList.add('hidden');
+            loginPanel.classList.remove('hidden');
+            signInButton.disabled = false;
+            recordPageVisit(position);
+        }
+
+        if (!requireGeolocation) {
+            recordPageVisit(null);
+            return;
+        }
+
+        if (!navigator.geolocation) {
+            showError('This browser does not support location access. Use HTTPS or a modern browser to sign in.');
+            return;
+        }
+
+        signInButton.disabled = true;
+
+        requestButton.addEventListener('click', function () {
+            requestButton.disabled = true;
+            status.classList.add('hidden');
+
+            navigator.geolocation.getCurrentPosition(
+                unlockLogin,
+                function (error) {
+                    let message = 'Location access is required to sign in.';
+                    if (error.code === error.PERMISSION_DENIED) {
+                        message = 'Location permission was denied. Allow location access for this site and try again.';
+                    } else if (error.code === error.POSITION_UNAVAILABLE) {
+                        message = 'Location is unavailable. Check your device settings and try again.';
+                    } else if (error.code === error.TIMEOUT) {
+                        message = 'Location request timed out. Try again.';
+                    }
+
+                    showError(message);
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 15000,
+                    maximumAge: 0
+                });
+        });
+    })();
+</script>
 </body>
 </html>

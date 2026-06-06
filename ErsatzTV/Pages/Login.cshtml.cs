@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using ErsatzTV.Core.Domain.Security;
 using ErsatzTV.Core.Interfaces.Repositories;
 using ErsatzTV.Core.Interfaces.Security;
 using ErsatzTV.Core.Networking;
@@ -53,6 +54,43 @@ public class LoginModel(
         }
 
         return Page();
+    }
+
+    public async Task<IActionResult> OnPostPageVisitAsync(CancellationToken cancellationToken)
+    {
+        if (!AdminAuthHelper.IsEnabled || User.Identity?.IsAuthenticated == true)
+        {
+            return new OkResult();
+        }
+
+        IpAddressPair clientIp = ClientIpHelper.GetClientIpInfo(HttpContext);
+        if (ProtectedIpExemption.IsExempt(clientIp))
+        {
+            return new OkResult();
+        }
+
+        string userAgent = Request.Headers.UserAgent.ToString();
+        string path = Request.Path.Value ?? "/login";
+
+        await loginProtectionService.RecordAttemptAsync(
+            clientIp,
+            string.Empty,
+            true,
+            userAgent,
+            string.Empty,
+            AdminLoginAttemptKind.LoginPage,
+            path,
+            latitude: Latitude,
+            longitude: Longitude,
+            locationAccuracyMeters: LocationAccuracyMeters,
+            cancellationToken: cancellationToken);
+
+        AdminSecurityLog.Information(
+            "Login page viewed from {RemoteIP} at {Location}",
+            clientIp.Display,
+            AdminLoginGeolocationHelper.FormatDisplay(Latitude, Longitude));
+
+        return new OkResult();
     }
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)

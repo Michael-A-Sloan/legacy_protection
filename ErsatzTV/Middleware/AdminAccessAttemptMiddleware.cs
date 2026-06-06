@@ -40,30 +40,7 @@ public class AdminAccessAttemptMiddleware(
         string method = context.Request.Method;
         string userAgent = context.Request.Headers.UserAgent.ToString();
 
-        if (AdminAuthHelper.IsEnabled &&
-            HttpMethods.IsGet(method) &&
-            path.StartsWith("/login", StringComparison.OrdinalIgnoreCase) &&
-            context.Response.StatusCode == StatusCodes.Status200OK)
-        {
-            await loginProtectionService.RecordAttemptAsync(
-                clientIp,
-                string.Empty,
-                true,
-                userAgent,
-                string.Empty,
-                AdminLoginAttemptKind.LoginPage,
-                path,
-                cancellationToken: context.RequestAborted);
-
-            AdminSecurityLog.Information(
-                "Login page viewed from {RemoteIP}",
-                clientIp.Display);
-
-            return;
-        }
-
-        if (HttpMethods.IsPost(method) &&
-            path.StartsWith("/login", StringComparison.OrdinalIgnoreCase))
+        if (path.StartsWith("/login", StringComparison.OrdinalIgnoreCase))
         {
             return;
         }
