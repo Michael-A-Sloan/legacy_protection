@@ -9,4 +9,6 @@ public record GetAdminLoginAttempts(
     bool? SuccessFilter,
     AdminLoginAttemptKind? AttemptKindFilter = null,
     string SortLabel = "timestamp",
-    bool SortDescending = true) : IRequest<PagedAdminLoginAttemptsViewModel>;
+    bool SortDescending = true,
+    LoginAttemptScope Scope = LoginAttemptScope.Active,
+    string BannedIpFilter = null) : IRequest<PagedAdminLoginAttemptsViewModel>;

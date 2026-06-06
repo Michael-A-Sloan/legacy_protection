@@ -69,6 +69,7 @@ using ErsatzTV.Infrastructure.Runtime;
 using ErsatzTV.Infrastructure.Scheduling;
 using ErsatzTV.Infrastructure.Scripting;
 using ErsatzTV.Infrastructure.Search;
+using ErsatzTV.Core.Security;
 using ErsatzTV.Infrastructure.Security;
 using ErsatzTV.Infrastructure.Sqlite.Data;
 using ErsatzTV.Infrastructure.Streaming;
@@ -179,6 +180,26 @@ public class Startup
             {
                 Log.Logger.Warning(
                     "Admin password is still set to the default value. Change ETV_ADMIN_PASSWORD before exposing this server.");
+            }
+
+            if (AdminLoginGeolocationSettings.IsRequiredFromEnvironment)
+            {
+                Log.Logger.Information(
+                    "Browser location is required for admin login (ETV_LOGIN_GEOLOCATION_REQUIRED).");
+            }
+        }
+
+        if (AdminVpnBlockSettings.IsEnabled)
+        {
+            if (AdminVpnBlockSettings.IsApiConfigured)
+            {
+                Log.Logger.Information("VPN/proxy blocking enabled via vpnapi.io API.");
+            }
+            else
+            {
+                Log.Logger.Information(
+                    "VPN/proxy blocking enabled. Set ETV_VPNAPI_KEY or place GeoIP Anonymous IP at {DatabasePath}.",
+                    AdminVpnBlockSettings.DatabasePath);
             }
         }
 
@@ -363,6 +384,24 @@ public class Startup
         services.AddValidatorsFromAssemblyContaining<Startup>();
 
         services.AddMemoryCache();
+
+        if (AdminVpnBlockSettings.IsEnabled)
+        {
+            services.AddHttpClient(
+                "VpnApi",
+                client =>
+                {
+                    client.BaseAddress = new Uri("https://vpnapi.io/");
+                    client.Timeout = TimeSpan.FromSeconds(10);
+                });
+            services.AddSingleton<VpnApiAnonymousIpDetectionService>();
+            services.AddSingleton<MaxMindAnonymousIpDetectionService>();
+            services.AddSingleton<IAnonymousIpDetectionService, CompositeAnonymousIpDetectionService>();
+        }
+        else
+        {
+            services.AddSingleton<IAnonymousIpDetectionService, NullAnonymousIpDetectionService>();
+        }
 
         services.AddRazorPages(options =>
         {
@@ -583,6 +622,24 @@ public class Startup
         app.UseCors("AllowAll");
         app.UseForwardedHeaders();
 
+        if (AdminVpnBlockSettings.IsEnabled)
+        {
+            IAnonymousIpDetectionService vpnDetection =
+                app.ApplicationServices.GetRequiredService<IAnonymousIpDetectionService>();
+            if (vpnDetection.IsConfigured)
+            {
+                Log.Logger.Information(
+                    "VPN/proxy blocking active using {Provider}",
+                    vpnDetection.DatabasePath);
+            }
+            else
+            {
+                Log.Logger.Warning(
+                    "VPN/proxy blocking is enabled but not configured. Set ETV_VPNAPI_KEY or add a MaxMind Anonymous IP database at {DatabasePath}",
+                    AdminVpnBlockSettings.DatabasePath);
+            }
+        }
+
         //app.UseHttpLogging();
         app.UseSerilogRequestLogging(options =>
         {
@@ -694,6 +751,7 @@ public class Startup
 
                 if (AdminProtectionHelper.IsEnabled)
                 {
+                    blazor.UseMiddleware<VpnBlockMiddleware>();
                     blazor.UseAuthentication();
 #pragma warning disable ASP0001
                     blazor.UseAuthorization();

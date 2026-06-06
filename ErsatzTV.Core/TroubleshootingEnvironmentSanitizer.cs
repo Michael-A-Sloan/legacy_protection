@@ -9,7 +9,9 @@ public static class TroubleshootingEnvironmentSanitizer
     private static readonly System.Collections.Generic.HashSet<string> FullyRedactedKeys = new(StringComparer.OrdinalIgnoreCase)
     {
         "ETV_ADMIN_PASSWORD",
-        "ETV_ADMIN_USERNAME"
+        "ETV_ADMIN_USERNAME",
+        "ETV_VPNAPI_KEY",
+        "ETV_VPNAPI_API_KEY"
     };
 
     public static Dictionary<string, string> CollectSanitizedEnvironmentVariables()

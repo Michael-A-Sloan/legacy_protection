@@ -82,14 +82,6 @@
             background: #00a000;
         }
 
-        button.secondary {
-            background: #424242;
-        }
-
-        button.secondary:hover {
-            background: #616161;
-        }
-
         button:disabled {
             opacity: 0.6;
             cursor: not-allowed;
@@ -114,18 +106,11 @@
     <img src="images/ersatztv.png?v=2" alt="ErsatzTV"/>
     <h1>Admin Login</h1>
 
+    <div id="location-error" class="error hidden"></div>
+
     @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
     {
         <div class="error">@Model.ErrorMessage</div>
-    }
-
-    @if (Model.RequireGeolocation)
-    {
-        <div id="location-gate">
-            <p>Browser location access is required before you can sign in. Visits and login attempts are recorded with your coordinates when available.</p>
-            <button type="button" id="request-location" class="secondary">Allow Location Access</button>
-            <p id="location-status" class="hidden"></p>
-        </div>
     }
 
     <div id="login-panel" class="@(Model.RequireGeolocation ? "hidden" : string.Empty)">
@@ -151,10 +136,8 @@
 <script>
     (function () {
         const requireGeolocation = @Model.RequireGeolocation.ToString().ToLowerInvariant();
-        const gate = document.getElementById('location-gate');
         const loginPanel = document.getElementById('login-panel');
-        const requestButton = document.getElementById('request-location');
-        const status = document.getElementById('location-status');
+        const locationError = document.getElementById('location-error');
         const latitudeInput = document.getElementById('latitude');
         const longitudeInput = document.getElementById('longitude');
         const accuracyInput = document.getElementById('location-accuracy');
@@ -184,18 +167,18 @@
             });
         }
 
-        function showError(message) {
-            status.textContent = message;
-            status.className = 'error';
-            status.classList.remove('hidden');
-            requestButton.disabled = false;
+        function showLocationError(message) {
+            locationError.textContent = message;
+            locationError.classList.remove('hidden');
+            loginPanel.classList.add('hidden');
+            signInButton.disabled = true;
         }
 
         function unlockLogin(position) {
             latitudeInput.value = position.coords.latitude;
             longitudeInput.value = position.coords.longitude;
             accuracyInput.value = position.coords.accuracy;
-            gate.classList.add('hidden');
+            locationError.classList.add('hidden');
             loginPanel.classList.remove('hidden');
             signInButton.disabled = false;
             recordPageVisit(position);
@@ -206,37 +189,42 @@
             return;
         }
 
+        signInButton.disabled = true;
+
         if (!navigator.geolocation) {
-            showError('This browser does not support location access. Use HTTPS or a modern browser to sign in.');
+            showLocationError('Location access is required to sign in.');
             return;
         }
 
-        signInButton.disabled = true;
+        navigator.geolocation.getCurrentPosition(
+            unlockLogin,
+            function (error) {
+                if (error.code === error.PERMISSION_DENIED) {
+                    showLocationError('Location access is required to sign in.');
+                    return;
+                }
 
-        requestButton.addEventListener('click', function () {
-            requestButton.disabled = true;
-            status.classList.add('hidden');
+                if (error.code === error.TIMEOUT) {
+                    navigator.geolocation.getCurrentPosition(
+                        unlockLogin,
+                        function () {
+                            showLocationError('Location access is required to sign in.');
+                        },
+                        {
+                            enableHighAccuracy: true,
+                            timeout: 30000,
+                            maximumAge: 0
+                        });
+                    return;
+                }
 
-            navigator.geolocation.getCurrentPosition(
-                unlockLogin,
-                function (error) {
-                    let message = 'Location access is required to sign in.';
-                    if (error.code === error.PERMISSION_DENIED) {
-                        message = 'Location permission was denied. Allow location access for this site and try again.';
-                    } else if (error.code === error.POSITION_UNAVAILABLE) {
-                        message = 'Location is unavailable. Check your device settings and try again.';
-                    } else if (error.code === error.TIMEOUT) {
-                        message = 'Location request timed out. Try again.';
-                    }
-
-                    showError(message);
-                },
-                {
-                    enableHighAccuracy: true,
-                    timeout: 15000,
-                    maximumAge: 0
-                });
-        });
+                showLocationError('Location access is required to sign in.');
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 15000,
+                maximumAge: 0
+            });
     })();
 </script>
 </body>

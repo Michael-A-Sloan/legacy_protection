@@ -6,7 +6,7 @@ public static class AdminLoginGeolocationHelper
     {
         if (!latitude.HasValue || !longitude.HasValue)
         {
-            errorMessage = "Browser location is required to sign in.";
+            errorMessage = "Location access is required to sign in.";
             return false;
         }
 

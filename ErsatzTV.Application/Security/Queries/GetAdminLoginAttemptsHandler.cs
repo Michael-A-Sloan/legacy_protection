@@ -14,7 +14,13 @@ public class GetAdminLoginAttemptsHandler(IDbContextFactory<TvContext> dbContext
     {
         await using TvContext dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
+        List<string> blacklistRules =
+            await BannedIpAttemptMatching.GetBlacklistRuleAddresses(dbContext, cancellationToken);
+        System.Collections.Generic.HashSet<string> bannedAddresses = BannedIpAttemptMatching.ExpandRuleAddresses(blacklistRules);
+
         IQueryable<AdminLoginAttempt> query = dbContext.AdminLoginAttempts.AsNoTracking();
+        query = BannedIpAttemptMatching.ApplyScope(query, request.Scope, bannedAddresses);
+        query = BannedIpAttemptMatching.ApplyBannedIpFilter(query, request.BannedIpFilter);
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {

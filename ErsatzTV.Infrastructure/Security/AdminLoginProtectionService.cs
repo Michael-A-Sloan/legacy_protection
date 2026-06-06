@@ -3,6 +3,7 @@ using ErsatzTV.Core.Domain.Security;
 using ErsatzTV.Core.Interfaces.Repositories;
 using ErsatzTV.Core.Interfaces.Security;
 using ErsatzTV.Core.Networking;
+using ErsatzTV.Core.Security;
 using ErsatzTV.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,7 +11,8 @@ namespace ErsatzTV.Infrastructure.Security;
 
 public class AdminLoginProtectionService(
     IDbContextFactory<TvContext> dbContextFactory,
-    IConfigElementRepository configElementRepository) : IAdminLoginProtectionService
+    IConfigElementRepository configElementRepository,
+    IAnonymousIpDetectionService anonymousIpDetectionService) : IAdminLoginProtectionService
 {
     private const int DefaultMaxFailedAttempts = 5;
     private const int DefaultWindowSeconds = 300;
@@ -23,6 +25,16 @@ public class AdminLoginProtectionService(
         if (ProtectedIpExemption.IsExempt(clientIp))
         {
             return new AdminLoginAccessResult(true, null);
+        }
+
+        if (AdminVpnBlockSettings.IsEnabled)
+        {
+            AnonymousIpLookupResult vpnLookup =
+                AnonymousIpDetectionHelper.LookupClientIp(anonymousIpDetectionService, clientIp);
+            if (vpnLookup.IsBlocked)
+            {
+                return new AdminLoginAccessResult(false, vpnLookup.DenyReason);
+            }
         }
 
         LoginIpSettings settings = await GetSettings(cancellationToken);

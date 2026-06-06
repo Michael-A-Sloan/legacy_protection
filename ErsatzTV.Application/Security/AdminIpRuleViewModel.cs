@@ -12,4 +12,9 @@ public class AdminIpRuleViewModel
     public AdminIpRuleType RuleType { get; set; }
     public string Note { get; set; }
     public DateTime CreatedAt { get; set; }
+    public int PageViewCount { get; set; }
+    public int LoginAttemptCount { get; set; }
+    public int AccessDeniedCount { get; set; }
+    public int TotalActivityCount { get; set; }
+    public DateTime? LastActivityAt { get; set; }
 }

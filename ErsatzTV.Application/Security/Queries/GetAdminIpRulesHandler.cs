@@ -25,9 +25,15 @@ public class GetAdminIpRulesHandler(IDbContextFactory<TvContext> dbContextFactor
             .OrderByDescending(r => r.CreatedAt)
             .ToListAsync(cancellationToken);
 
+        Dictionary<string, BannedIpActivitySummary> activityByRule = request.RuleType == AdminIpRuleType.Blacklist
+            ? await LoadBannedActivitySummaries(dbContext, rules, cancellationToken)
+            : [];
+
         return rules.Select(r =>
         {
             IpAddressPair pair = IpAddressFormatting.FromString(r.IpAddress);
+            activityByRule.TryGetValue(r.IpAddress, out BannedIpActivitySummary activity);
+
             return new AdminIpRuleViewModel
             {
                 Id = r.Id,
@@ -36,8 +42,84 @@ public class GetAdminIpRulesHandler(IDbContextFactory<TvContext> dbContextFactor
                 IpAddressV6 = pair.Ipv6 ?? string.Empty,
                 RuleType = r.RuleType,
                 Note = r.Note,
-                CreatedAt = r.CreatedAt
+                CreatedAt = r.CreatedAt,
+                PageViewCount = activity?.PageViewCount ?? 0,
+                LoginAttemptCount = activity?.LoginAttemptCount ?? 0,
+                AccessDeniedCount = activity?.AccessDeniedCount ?? 0,
+                TotalActivityCount = activity?.TotalActivityCount ?? 0,
+                LastActivityAt = activity?.LastActivityAt
             };
         }).ToList();
+    }
+
+    private static async Task<Dictionary<string, BannedIpActivitySummary>> LoadBannedActivitySummaries(
+        TvContext dbContext,
+        List<AdminIpRule> blacklistRules,
+        CancellationToken cancellationToken)
+    {
+        if (blacklistRules.Count == 0)
+        {
+            return [];
+        }
+
+        System.Collections.Generic.HashSet<string> allBannedAddresses =
+            BannedIpAttemptMatching.ExpandRuleAddresses(blacklistRules.Select(r => r.IpAddress));
+
+        List<AdminLoginAttempt> attempts = await dbContext.AdminLoginAttempts.AsNoTracking()
+            .Where(a =>
+                allBannedAddresses.Contains(a.IpAddress) ||
+                allBannedAddresses.Contains(a.IpAddressV4) ||
+                allBannedAddresses.Contains(a.IpAddressV6))
+            .ToListAsync(cancellationToken);
+
+        var summaries = blacklistRules.ToDictionary(
+            r => r.IpAddress,
+            _ => new BannedIpActivitySummary(),
+            StringComparer.OrdinalIgnoreCase);
+
+        foreach (AdminLoginAttempt attempt in attempts)
+        {
+            AdminIpRule matchedRule = blacklistRules.FirstOrDefault(rule =>
+                BannedIpAttemptMatching.MatchesAnyRuleAddress(
+                    attempt,
+                    BannedIpAttemptMatching.ExpandRuleAddresses([rule.IpAddress])));
+
+            if (matchedRule is null)
+            {
+                continue;
+            }
+
+            BannedIpActivitySummary summary = summaries[matchedRule.IpAddress];
+            summary.TotalActivityCount++;
+
+            if (!summary.LastActivityAt.HasValue || attempt.Timestamp > summary.LastActivityAt)
+            {
+                summary.LastActivityAt = attempt.Timestamp;
+            }
+
+            switch (attempt.AttemptKind)
+            {
+                case AdminLoginAttemptKind.LoginPage:
+                    summary.PageViewCount++;
+                    break;
+                case AdminLoginAttemptKind.Login:
+                    summary.LoginAttemptCount++;
+                    break;
+                case AdminLoginAttemptKind.AccessDenied:
+                    summary.AccessDeniedCount++;
+                    break;
+            }
+        }
+
+        return summaries;
+    }
+
+    private sealed class BannedIpActivitySummary
+    {
+        public int PageViewCount { get; set; }
+        public int LoginAttemptCount { get; set; }
+        public int AccessDeniedCount { get; set; }
+        public int TotalActivityCount { get; set; }
+        public DateTime? LastActivityAt { get; set; }
     }
 }
