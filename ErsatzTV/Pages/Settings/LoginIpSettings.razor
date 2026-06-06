@@ -228,12 +228,82 @@
             <MudDivider Class="mb-6"/>
             <MudText Typo="Typo.h6" Class="mb-4">Login &amp; Access Attempts</MudText>
             <MudText Typo="Typo.body2" Class="mb-4 mud-text-secondary">
-                Includes login form submissions, login page visits, and unauthenticated access to the admin UI.
-                Banned IP addresses are excluded here and shown under Banned IP Activity above.
+                Activity is grouped by IP address. Banned IP addresses are excluded here and shown under Banned IP Activity above.
             </MudText>
+            <MudTable FixedHeader="true"
+                      @bind-RowsPerPage="@_activeSummaryRowsPerPage"
+                      ServerData="@(new Func<TableState, CancellationToken, Task<TableData<AdminLoginIpSummaryViewModel>>>(ServerReloadActiveIpSummaries))"
+                      Dense="true"
+                      Class="mb-4"
+                      @ref="_activeIpSummariesTable">
+                <HeaderContent>
+                    <MudTh>
+                        <MudTableSortLabel T="AdminLoginIpSummaryViewModel" SortLabel="IpAddressV4">IPv4</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel T="AdminLoginIpSummaryViewModel" SortLabel="IpAddressV6">IPv6</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel T="AdminLoginIpSummaryViewModel" SortLabel="Views">Views</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel T="AdminLoginIpSummaryViewModel" SortLabel="Logins">Logins</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel T="AdminLoginIpSummaryViewModel" SortLabel="Access">Access</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel T="AdminLoginIpSummaryViewModel" SortLabel="Success">Success</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel T="AdminLoginIpSummaryViewModel" SortLabel="Failed">Failed</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel T="AdminLoginIpSummaryViewModel" SortLabel="Total">Total</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel T="AdminLoginIpSummaryViewModel" SortLabel="LastActivity">Last Seen</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@FormatIp(context.IpAddressV4)</MudTd>
+                    <MudTd>@FormatIp(context.IpAddressV6)</MudTd>
+                    <MudTd>@context.PageViewCount</MudTd>
+                    <MudTd>@context.LoginAttemptCount</MudTd>
+                    <MudTd>@context.AccessDeniedCount</MudTd>
+                    <MudTd>@context.SuccessCount</MudTd>
+                    <MudTd>@context.FailedCount</MudTd>
+                    <MudTd>@context.TotalActivityCount</MudTd>
+                    <MudTd>@FormatLastActivity(context.LastActivityAt)</MudTd>
+                    <MudTd>
+                        <MudButton Variant="Variant.Text" Color="Color.Secondary" Size="Size.Small"
+                                   OnClick="@(_ => ShowActiveActivity(context.IpAddress))">Activity</MudButton>
+                        @if (CanBan(context.IpAddress))
+                        {
+                            <MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small"
+                                       OnClick="@(_ => BanFromAttempt(context.IpAddress))">Ban</MudButton>
+                        }
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText>No login attempts recorded yet.</MudText>
+                </NoRecordsContent>
+                <PagerContent>
+                    <MudTablePager/>
+                </PagerContent>
+            </MudTable>
+
+            <MudText Typo="Typo.subtitle1" Class="mb-2">Login IP Activity</MudText>
             <MudStack Row="true" Spacing="2" Class="mb-4">
-                <MudTextField @bind-Value="_searchString" Label="Search IP, username, path, or reason" Adornment="Adornment.Start"
-                              AdornmentIcon="@Icons.Material.Filled.Search"/>
+                <MudSelect T="string" @bind-Value="_activeIpFilter" Label="Filter by IP" Style="max-width: 280px" Clearable="true">
+                    @foreach (AdminLoginIpSummaryViewModel summary in _activeIpFilterOptions)
+                    {
+                        <MudSelectItem T="string" Value="@summary.IpAddress">@FormatIp(summary.IpAddressV4) / @FormatIp(summary.IpAddressV6)</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudTextField @bind-Value="_searchString" Label="Search username, path, or reason" Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search" Style="max-width: 320px"/>
                 <MudSelect T="AdminLoginAttemptKind?" @bind-Value="_attemptKindFilter" Label="Type" Style="max-width: 200px">
                     <MudSelectItem T="AdminLoginAttemptKind?" Value="@((AdminLoginAttemptKind?)null)">All</MudSelectItem>
                     <MudSelectItem T="AdminLoginAttemptKind?" Value="@AdminLoginAttemptKind.Login">Login</MudSelectItem>
@@ -246,6 +316,7 @@
                     <MudSelectItem T="bool?" Value="@false">Failed</MudSelectItem>
                 </MudSelect>
                 <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@ReloadAttempts">Search</MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@ReloadActiveIpSummaries">Refresh</MudButton>
                 <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="@(_ => _showClearLogConfirm = true)">Clear Log</MudButton>
             </MudStack>
             @if (_showClearLogConfirm)
@@ -354,10 +425,14 @@
     private List<AdminIpRuleViewModel> _blacklistRules = [];
     private MudTable<AdminLoginAttemptViewModel> _attemptsTable;
     private MudTable<AdminLoginAttemptViewModel> _bannedAttemptsTable;
+    private MudTable<AdminLoginIpSummaryViewModel> _activeIpSummariesTable;
     private int _rowsPerPage = 10;
     private int _bannedRowsPerPage = 10;
+    private int _activeSummaryRowsPerPage = 10;
     private string _searchString;
     private string _bannedIpFilter;
+    private string _activeIpFilter;
+    private List<AdminLoginIpSummaryViewModel> _activeIpFilterOptions = [];
     private bool _showClearLogConfirm;
     private bool? _successFilter;
     private AdminLoginAttemptKind? _attemptKindFilter;
@@ -385,6 +460,7 @@
             _rowsPerPage = await Mediator.Send(new GetConfigElementByKey(ConfigElementKey.LoginIpAttemptsPageSize), token)
                 .Map(maybeRows => maybeRows.Match(ce => int.TryParse(ce.Value, out int rows) ? rows : 10, () => 10));
             await LoadRules(token);
+            await LoadActiveIpFilterOptions(token);
         }
         catch (OperationCanceledException)
         {
@@ -396,6 +472,13 @@
     {
         _whitelistRules = await Mediator.Send(new GetAdminIpRules(AdminIpRuleType.Whitelist), token);
         _blacklistRules = await Mediator.Send(new GetAdminIpRules(AdminIpRuleType.Blacklist), token);
+    }
+
+    private async Task LoadActiveIpFilterOptions(CancellationToken token)
+    {
+        PagedAdminLoginIpSummariesViewModel data =
+            await Mediator.Send(new GetAdminLoginIpSummaries(0, 10000, null), token);
+        _activeIpFilterOptions = data.Page;
     }
 
     private async Task SaveSettings()
@@ -438,6 +521,7 @@
         if (ruleType == AdminIpRuleType.Blacklist)
         {
             await ReloadBannedAttempts();
+            await ReloadActiveIpSummaries();
             await ReloadAttempts();
         }
     }
@@ -471,7 +555,9 @@
         }
 
         await LoadRules(_cts.Token);
+        await LoadActiveIpFilterOptions(_cts.Token);
         await ReloadBannedAttempts();
+        await ReloadActiveIpSummaries();
         await ReloadAttempts();
     }
 
@@ -486,8 +572,15 @@
         }
 
         Snackbar.Add("IP banned", Severity.Success);
+        if (string.Equals(_activeIpFilter, ipAddress, StringComparison.OrdinalIgnoreCase))
+        {
+            _activeIpFilter = null;
+        }
+
         await LoadRules(_cts.Token);
+        await LoadActiveIpFilterOptions(_cts.Token);
         await ReloadBannedAttempts();
+        await ReloadActiveIpSummaries();
         await ReloadAttempts();
     }
 
@@ -495,6 +588,12 @@
     {
         _bannedIpFilter = ipAddress;
         await ReloadBannedAttempts();
+    }
+
+    private async Task ShowActiveActivity(string ipAddress)
+    {
+        _activeIpFilter = ipAddress;
+        await ReloadAttempts();
     }
 
     private bool IsBlacklisted(string ipAddress) =>
@@ -551,7 +650,34 @@
         Snackbar.Add(
             deleted == 0 ? "Login log is already empty." : $"Cleared {deleted} log entries.",
             Severity.Success);
+        await LoadActiveIpFilterOptions(_cts.Token);
+        await ReloadActiveIpSummaries();
         await ReloadAttempts();
+    }
+
+    private async Task ReloadActiveIpSummaries()
+    {
+        if (_activeIpSummariesTable is not null)
+        {
+            await _activeIpSummariesTable.ReloadServerData();
+        }
+
+        await LoadActiveIpFilterOptions(_cts.Token);
+    }
+
+    private async Task<TableData<AdminLoginIpSummaryViewModel>> ServerReloadActiveIpSummaries(
+        TableState state,
+        CancellationToken cancellationToken)
+    {
+        GetAdminLoginIpSummaries query = new(
+            state.Page,
+            state.PageSize,
+            null,
+            state.SortLabel?.ToLowerInvariant() ?? "lastactivity",
+            state.SortDirection == SortDirection.None || state.SortDirection == SortDirection.Descending);
+
+        PagedAdminLoginIpSummariesViewModel data = await Mediator.Send(query, cancellationToken);
+        return new TableData<AdminLoginIpSummaryViewModel> { TotalItems = data.TotalCount, Items = data.Page };
     }
 
     private async Task<TableData<AdminLoginAttemptViewModel>> ServerReloadAttempts(
@@ -570,7 +696,8 @@
             _attemptKindFilter,
             state.SortLabel?.ToLowerInvariant() ?? "timestamp",
             state.SortDirection == SortDirection.None || state.SortDirection == SortDirection.Descending,
-            LoginAttemptScope.Active);
+            LoginAttemptScope.Active,
+            _activeIpFilter);
 
         PagedAdminLoginAttemptsViewModel data = await Mediator.Send(query, cancellationToken);
         return new TableData<AdminLoginAttemptViewModel> { TotalItems = data.TotalCount, Items = data.Page };

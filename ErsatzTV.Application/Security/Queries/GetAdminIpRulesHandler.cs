@@ -25,14 +25,14 @@ public class GetAdminIpRulesHandler(IDbContextFactory<TvContext> dbContextFactor
             .OrderByDescending(r => r.CreatedAt)
             .ToListAsync(cancellationToken);
 
-        Dictionary<string, BannedIpActivitySummary> activityByRule = request.RuleType == AdminIpRuleType.Blacklist
+        Dictionary<string, IpAttemptActivitySummary> activityByRule = request.RuleType == AdminIpRuleType.Blacklist
             ? await LoadBannedActivitySummaries(dbContext, rules, cancellationToken)
             : [];
 
         return rules.Select(r =>
         {
             IpAddressPair pair = IpAddressFormatting.FromString(r.IpAddress);
-            activityByRule.TryGetValue(r.IpAddress, out BannedIpActivitySummary activity);
+            activityByRule.TryGetValue(r.IpAddress, out IpAttemptActivitySummary activity);
 
             return new AdminIpRuleViewModel
             {
@@ -52,7 +52,7 @@ public class GetAdminIpRulesHandler(IDbContextFactory<TvContext> dbContextFactor
         }).ToList();
     }
 
-    private static async Task<Dictionary<string, BannedIpActivitySummary>> LoadBannedActivitySummaries(
+    private static async Task<Dictionary<string, IpAttemptActivitySummary>> LoadBannedActivitySummaries(
         TvContext dbContext,
         List<AdminIpRule> blacklistRules,
         CancellationToken cancellationToken)
@@ -74,7 +74,16 @@ public class GetAdminIpRulesHandler(IDbContextFactory<TvContext> dbContextFactor
 
         var summaries = blacklistRules.ToDictionary(
             r => r.IpAddress,
-            _ => new BannedIpActivitySummary(),
+            r =>
+            {
+                IpAddressPair pair = IpAddressFormatting.FromString(r.IpAddress);
+                return new IpAttemptActivitySummary
+                {
+                    IpAddress = r.IpAddress,
+                    IpAddressV4 = pair.Ipv4 ?? string.Empty,
+                    IpAddressV6 = pair.Ipv6 ?? string.Empty
+                };
+            },
             StringComparer.OrdinalIgnoreCase);
 
         foreach (AdminLoginAttempt attempt in attempts)
@@ -89,37 +98,9 @@ public class GetAdminIpRulesHandler(IDbContextFactory<TvContext> dbContextFactor
                 continue;
             }
 
-            BannedIpActivitySummary summary = summaries[matchedRule.IpAddress];
-            summary.TotalActivityCount++;
-
-            if (!summary.LastActivityAt.HasValue || attempt.Timestamp > summary.LastActivityAt)
-            {
-                summary.LastActivityAt = attempt.Timestamp;
-            }
-
-            switch (attempt.AttemptKind)
-            {
-                case AdminLoginAttemptKind.LoginPage:
-                    summary.PageViewCount++;
-                    break;
-                case AdminLoginAttemptKind.Login:
-                    summary.LoginAttemptCount++;
-                    break;
-                case AdminLoginAttemptKind.AccessDenied:
-                    summary.AccessDeniedCount++;
-                    break;
-            }
+            IpAttemptActivityAggregator.ApplyAttemptToSummary(summaries[matchedRule.IpAddress], attempt);
         }
 
         return summaries;
-    }
-
-    private sealed class BannedIpActivitySummary
-    {
-        public int PageViewCount { get; set; }
-        public int LoginAttemptCount { get; set; }
-        public int AccessDeniedCount { get; set; }
-        public int TotalActivityCount { get; set; }
-        public DateTime? LastActivityAt { get; set; }
     }
 }

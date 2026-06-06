@@ -80,16 +80,16 @@ public static class BannedIpAttemptMatching
                 !bannedAddresses.Contains(a.IpAddressV6));
     }
 
-    public static IQueryable<AdminLoginAttempt> ApplyBannedIpFilter(
+    public static IQueryable<AdminLoginAttempt> ApplyIpAddressFilter(
         IQueryable<AdminLoginAttempt> query,
-        string bannedIpFilter)
+        string ipAddressFilter)
     {
-        if (string.IsNullOrWhiteSpace(bannedIpFilter))
+        if (string.IsNullOrWhiteSpace(ipAddressFilter))
         {
             return query;
         }
 
-        System.Collections.Generic.HashSet<string> addresses = ExpandRuleAddresses([bannedIpFilter]);
+        System.Collections.Generic.HashSet<string> addresses = ExpandRuleAddresses([ipAddressFilter]);
 
         return query.Where(a =>
             addresses.Contains(a.IpAddress) ||

@@ -20,7 +20,7 @@ public class GetAdminLoginAttemptsHandler(IDbContextFactory<TvContext> dbContext
 
         IQueryable<AdminLoginAttempt> query = dbContext.AdminLoginAttempts.AsNoTracking();
         query = BannedIpAttemptMatching.ApplyScope(query, request.Scope, bannedAddresses);
-        query = BannedIpAttemptMatching.ApplyBannedIpFilter(query, request.BannedIpFilter);
+        query = BannedIpAttemptMatching.ApplyIpAddressFilter(query, request.IpAddressFilter);
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
