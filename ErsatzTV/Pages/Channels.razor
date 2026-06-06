@@ -1,5 +1,6 @@
 @page "/channels"
 @using System.Globalization
+@using ErsatzTV.Application.Streaming
 @using ErsatzTV.Application.Channels
 @using ErsatzTV.Application.Configuration
 @using ErsatzTV.Application.FFmpegProfiles
@@ -42,6 +43,7 @@
                         <col style="width: 15%"/>
                         <col style="width: 15%"/>
                         <col style="width: 15%"/>
+                        <col style="width: 8%"/>
                         <col style="width: 15%"/>
                         <col style="width: 300px;"/>
                     </MudHidden>
@@ -56,6 +58,11 @@
                     </MudTh>
                     <MudTh>@Loc["LabelLanguage"]</MudTh>
                     <MudTh>@Loc["LabelStreamingMode"]</MudTh>
+                    <MudTh>
+                        <MudTooltip Text="@Loc["LabelActiveViewersHelp"]">
+                            <span>@Loc["LabelActiveViewers"]</span>
+                        </MudTooltip>
+                    </MudTh>
                     <MudTh>@Loc["LabelFFmpegProfile"]</MudTh>
                     <MudTh/>
                 </HeaderContent>
@@ -91,6 +98,18 @@
                     <MudTd DataLabel="@Loc["LabelName"]">@context.Name</MudTd>
                     <MudTd DataLabel="@Loc["LabelLanguage"]">@context.PreferredAudioLanguageCode</MudTd>
                     <MudTd DataLabel="@Loc["LabelStreamingMode"]">@GetStreamingMode(context.StreamingMode)</MudTd>
+                    <MudTd DataLabel="@Loc["LabelActiveViewers"]">
+                        @if (GetActiveViewerCount(context.Number) > 0)
+                        {
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small">
+                                @GetActiveViewerCount(context.Number)
+                            </MudChip>
+                        }
+                        else
+                        {
+                            @("0")
+                        }
+                    </MudTd>
                     <MudTd DataLabel="@Loc["LabelFFmpegProfile"]">
                         @if (context.StreamingMode != StreamingMode.HttpLiveStreamingDirect)
                         {
@@ -192,6 +211,8 @@
     private readonly Dictionary<int, bool> _ffmpegProfilesThatCanPreview = [];
     private bool _showDisabled;
     private int _rowsPerPage = 10;
+    private IReadOnlyDictionary<string, int> _viewerCounts = new Dictionary<string, int>();
+    private bool _viewerRefreshStarted;
 
     private bool ShowDisabled
     {
@@ -214,6 +235,7 @@
     public void Dispose()
     {
         SegmenterService.OnWorkersChanged -= WorkersChanged;
+        _viewerRefreshStarted = false;
 
         _cts?.Cancel();
         _cts?.Dispose();
@@ -223,6 +245,7 @@
     {
         _cts?.Cancel();
         _cts?.Dispose();
+        _viewerRefreshStarted = false;
         _cts = new CancellationTokenSource();
         var token = _cts.Token;
 
@@ -234,12 +257,50 @@
                 .Map(maybeRows => maybeRows.Match(ce => int.TryParse(ce.Value, out int rows) ? rows : 10, () => 10));
             _showDisabled = await Mediator.Send(new GetConfigElementByKey(ConfigElementKey.ChannelsShowDisabled), token)
                 .Map(maybeShow => maybeShow.Match(ce => bool.TryParse(ce.Value, out bool show) && show, () => false));
+            await RefreshViewerCounts(token);
+            StartViewerRefreshLoop();
         }
         catch (OperationCanceledException)
         {
             // do nothing
         }
     }
+
+    private void StartViewerRefreshLoop()
+    {
+        if (_viewerRefreshStarted)
+        {
+            return;
+        }
+
+        _viewerRefreshStarted = true;
+        _ = RefreshViewerCountsLoop();
+    }
+
+    private async Task RefreshViewerCountsLoop()
+    {
+        try
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
+            while (_cts is not null && await timer.WaitForNextTickAsync(_cts.Token))
+            {
+                await RefreshViewerCounts(_cts.Token);
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // do nothing
+        }
+    }
+
+    private async Task RefreshViewerCounts(CancellationToken cancellationToken)
+    {
+        _viewerCounts = await Mediator.Send(new GetActiveIptvViewerCounts(), cancellationToken);
+    }
+
+    private int GetActiveViewerCount(string channelNumber) =>
+        _viewerCounts.TryGetValue(channelNumber, out int count) ? count : 0;
 
     private async Task StopChannel(ChannelViewModel channel)
     {

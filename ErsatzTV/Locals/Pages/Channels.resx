@@ -45,6 +45,12 @@
     <data name="LabelStreamingMode" xml:space="preserve">
         <value>Mode</value>
     </data>
+    <data name="LabelActiveViewers" xml:space="preserve">
+        <value>Viewers</value>
+    </data>
+    <data name="LabelActiveViewersHelp" xml:space="preserve">
+        <value>Unique clients with playlist or segment activity in the last 60 seconds</value>
+    </data>
     <data name="LabelFFmpegProfile" xml:space="preserve">
         <value>FFmpeg Profile</value>
     </data>

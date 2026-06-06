@@ -701,6 +701,8 @@ public class Startup
                     new AcceptLanguageHeaderRequestCultureProvider()));
         });
 
+        app.UseMiddleware<IptvStreamViewerMiddleware>();
+
         app.UseStaticFiles();
 
         var extensionProvider = new FileExtensionContentTypeProvider();
@@ -842,6 +844,7 @@ public class Startup
         }
         services.AddSingleton<IScannerProxyService, ScannerProxyService>();
         services.AddSingleton<IScriptedPlayoutBuilderService, ScriptedPlayoutBuilderService>();
+        services.AddSingleton<IIptvStreamViewerTracker, IptvStreamViewerTracker>();
         services.AddSingleton<IFFmpegSegmenterService, FFmpegSegmenterService>();
         services.AddSingleton<ITempFilePool, TempFilePool>();
         services.AddSingleton<IHlsPlaylistFilter, HlsPlaylistFilter>();

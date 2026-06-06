@@ -99,6 +99,18 @@ namespace ErsatzTV.Locals.Pages {
             }
         }
         
+        internal static string LabelActiveViewers {
+            get {
+                return ResourceManager.GetString("LabelActiveViewers", resourceCulture);
+            }
+        }
+        
+        internal static string LabelActiveViewersHelp {
+            get {
+                return ResourceManager.GetString("LabelActiveViewersHelp", resourceCulture);
+            }
+        }
+        
         internal static string LabelFFmpegProfile {
             get {
                 return ResourceManager.GetString("LabelFFmpegProfile", resourceCulture);
