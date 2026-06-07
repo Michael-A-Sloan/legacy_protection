@@ -71,6 +71,34 @@
             </MudText>
 
             <MudDivider Class="mb-6"/>
+            <MudText Typo="Typo.h6" Class="mb-4">AbuseIPDB Blocking</MudText>
+            @if (_settings.AbuseIpDbAvailable)
+            {
+                <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                    <MudText>Block Abusive IPs</MudText>
+                    <MudSwitch @bind-Value="_settings.AbuseIpDbBlockEnabled" Color="Color.Primary"/>
+                </MudStack>
+                <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                    <MudText>Minimum Abuse Score</MudText>
+                    <MudNumericField @bind-Value="_settings.AbuseIpDbMinScore" Min="0" Max="100" Style="max-width: 200px"/>
+                </MudStack>
+                <MudText Typo="Typo.body2" Class="mb-8 mud-text-secondary">
+                    Blocks admin UI access when AbuseIPDB reports an abuse confidence score at or above the threshold.
+                    IPTV streaming is not affected. Results are cached for 6 hours. Click <strong>AbuseIPDB</strong> on
+                    any IP below to view the full report.
+                </MudText>
+            }
+            else
+            {
+                <MudText Typo="Typo.body2" Class="mb-8 mud-text-secondary">
+                    Set <code>ETV_ABUSEIPDB_ENABLED=1</code> and <code>ETV_ABUSEIPDB_API_KEY</code> from your
+                    <MudLink Href="https://www.abuseipdb.com/" Target="_blank">AbuseIPDB</MudLink> account to enable
+                    abusive IP blocking for the admin UI. Optional: <code>ETV_ABUSEIPDB_MIN_SCORE</code> (default 75),
+                    <code>ETV_ABUSEIPDB_MAX_AGE_DAYS</code> (default 90).
+                </MudText>
+            }
+
+            <MudDivider Class="mb-6"/>
             <MudText Typo="Typo.h6" Class="mb-4">Whitelist</MudText>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <MudText>Enable Whitelist</MudText>
@@ -146,6 +174,11 @@
                     <MudTd>
                         <MudButton Variant="Variant.Text" Color="Color.Secondary" Size="Size.Small"
                                    OnClick="@(_ => ShowBannedActivity(context.IpAddress))">Activity</MudButton>
+                        @if (_settings.AbuseIpDbAvailable)
+                        {
+                            <MudButton Variant="Variant.Text" Color="Color.Info" Size="Size.Small"
+                                       OnClick="@(_ => ShowAbuseIpDbReport(context.IpAddress))">AbuseIPDB</MudButton>
+                        }
                         <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(_ => Unban(context.IpAddress))">Unban</MudButton>
                     </MudTd>
                 </RowTemplate>
@@ -279,6 +312,11 @@
                     <MudTd>
                         <MudButton Variant="Variant.Text" Color="Color.Secondary" Size="Size.Small"
                                    OnClick="@(_ => ShowActiveActivity(context.IpAddress))">Activity</MudButton>
+                        @if (_settings.AbuseIpDbAvailable)
+                        {
+                            <MudButton Variant="Variant.Text" Color="Color.Info" Size="Size.Small"
+                                       OnClick="@(_ => ShowAbuseIpDbReport(context.IpAddress))">AbuseIPDB</MudButton>
+                        }
                         @if (CanBan(context.IpAddress))
                         {
                             <MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small"
@@ -293,6 +331,77 @@
                     <MudTablePager/>
                 </PagerContent>
             </MudTable>
+
+            @if (_settings.AbuseIpDbAvailable)
+            {
+                <MudText Typo="Typo.subtitle1" Class="mb-2 mt-4">AbuseIPDB Report</MudText>
+                @if (string.IsNullOrWhiteSpace(_abuseIpDbIp))
+                {
+                    <MudText Typo="Typo.body2" Class="mb-8 mud-text-secondary">
+                        Click <strong>AbuseIPDB</strong> on an IP above to view its AbuseIPDB report.
+                    </MudText>
+                }
+                else
+                {
+                    <MudStack Row="true" Spacing="2" Class="mb-4">
+                        <MudText Typo="Typo.body1">@FormatAbuseIpDbTarget(_abuseIpDbIp)</MudText>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@ReloadAbuseIpDbReport">Refresh</MudButton>
+                        <MudButton Variant="Variant.Text" OnClick="@ClearAbuseIpDbReport">Clear</MudButton>
+                    </MudStack>
+                    @if (_abuseIpDbLoading)
+                    {
+                        <MudProgressLinear Indeterminate="true" Class="mb-8"/>
+                    }
+                    else if (_abuseIpDbReport?.LookupPerformed != true)
+                    {
+                        <MudAlert Severity="Severity.Warning" Class="mb-8" Variant="Variant.Outlined">
+                            @(_abuseIpDbReport?.ErrorMessage ?? "Unable to load AbuseIPDB report.")
+                        </MudAlert>
+                    }
+                    else
+                    {
+                        <MudPaper Class="pa-4 mb-8" Elevation="1">
+                            <MudStack Row="true" Spacing="2" Class="mb-4">
+                                <MudChip T="string" Color="@GetAbuseScoreColor(_abuseIpDbReport.AbuseConfidenceScore)" Size="Size.Small">
+                                    Score: @_abuseIpDbReport.AbuseConfidenceScore%
+                                </MudChip>
+                                @if (_abuseIpDbReport.WouldBlock)
+                                {
+                                    <MudChip T="string" Color="Color.Error" Size="Size.Small">Would Block</MudChip>
+                                }
+                                else
+                                {
+                                    <MudChip T="string" Color="Color.Success" Size="Size.Small">Below Threshold (@_abuseIpDbReport.MinScoreThreshold%)</MudChip>
+                                }
+                                @if (_abuseIpDbReport.IsWhitelisted)
+                                {
+                                    <MudChip T="string" Color="Color.Info" Size="Size.Small">Whitelisted</MudChip>
+                                }
+                            </MudStack>
+                            <MudSimpleTable Dense="true" Hover="true" Bordered="true" Style="overflow-x: auto;">
+                                <tbody>
+                                <tr><td>Queried IP</td><td>@_abuseIpDbReport.QueriedIpAddress</td></tr>
+                                <tr><td>Country</td><td>@FormatAbuseField(_abuseIpDbReport.CountryName, _abuseIpDbReport.CountryCode)</td></tr>
+                                <tr><td>ISP</td><td>@FormatAbuseField(_abuseIpDbReport.Isp)</td></tr>
+                                <tr><td>Domain</td><td>@FormatAbuseField(_abuseIpDbReport.Domain)</td></tr>
+                                <tr><td>Usage Type</td><td>@FormatAbuseField(_abuseIpDbReport.UsageType)</td></tr>
+                                <tr><td>Total Reports</td><td>@_abuseIpDbReport.TotalReports</td></tr>
+                                <tr><td>Distinct Reporters</td><td>@_abuseIpDbReport.NumDistinctUsers</td></tr>
+                                <tr><td>Last Reported</td><td>@FormatLastReported(_abuseIpDbReport.LastReportedAt)</td></tr>
+                                <tr><td>Public IP</td><td>@(_abuseIpDbReport.IsPublic ? "Yes" : "No")</td></tr>
+                                <tr><td>IP Version</td><td>@(_abuseIpDbReport.IpVersion == 0 ? "—" : _abuseIpDbReport.IpVersion.ToString())</td></tr>
+                                <tr>
+                                    <td>AbuseIPDB</td>
+                                    <td>
+                                        <MudLink Href="@_abuseIpDbReport.AbuseIpDbUrl" Target="_blank">View on AbuseIPDB</MudLink>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </MudSimpleTable>
+                        </MudPaper>
+                    }
+                }
+            }
 
             <MudText Typo="Typo.subtitle1" Class="mb-2">Login IP Activity</MudText>
             <MudStack Row="true" Spacing="2" Class="mb-4">
@@ -447,6 +556,9 @@
     private string _newWhitelistNote;
     private string _newBlacklistIp;
     private string _newBlacklistNote;
+    private string _abuseIpDbIp;
+    private AbuseIpDbReportViewModel _abuseIpDbReport;
+    private bool _abuseIpDbLoading;
 
     public void Dispose()
     {
@@ -603,6 +715,49 @@
         await ReloadAttempts();
     }
 
+    private async Task ShowAbuseIpDbReport(string ipAddress)
+    {
+        _abuseIpDbIp = ipAddress;
+        await LoadAbuseIpDbReport();
+    }
+
+    private async Task ReloadAbuseIpDbReport()
+    {
+        if (!string.IsNullOrWhiteSpace(_abuseIpDbIp))
+        {
+            await LoadAbuseIpDbReport();
+        }
+    }
+
+    private void ClearAbuseIpDbReport()
+    {
+        _abuseIpDbIp = null;
+        _abuseIpDbReport = null;
+        _abuseIpDbLoading = false;
+    }
+
+    private async Task LoadAbuseIpDbReport()
+    {
+        if (string.IsNullOrWhiteSpace(_abuseIpDbIp))
+        {
+            return;
+        }
+
+        _abuseIpDbLoading = true;
+        try
+        {
+            _abuseIpDbReport = await Mediator.Send(new GetAbuseIpDbReport(_abuseIpDbIp), _cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // do nothing
+        }
+        finally
+        {
+            _abuseIpDbLoading = false;
+        }
+    }
+
     private async Task OnActiveIpFilterChanged(string ipAddress)
     {
         _activeIpFilter = ipAddress;
@@ -637,6 +792,35 @@
 
     private static string FormatLastActivity(DateTime? lastActivityAt) =>
         lastActivityAt?.ToLocalTime().ToString("g", CultureInfo.CurrentCulture.DateTimeFormat) ?? "—";
+
+    private static string FormatAbuseField(string value, string suffix = null)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "—";
+        }
+
+        return string.IsNullOrWhiteSpace(suffix) ? value : $"{value} ({suffix})";
+    }
+
+    private static string FormatLastReported(DateTimeOffset? lastReportedAt) =>
+        lastReportedAt?.ToLocalTime().ToString("G", CultureInfo.CurrentCulture.DateTimeFormat) ?? "—";
+
+    private static string FormatAbuseIpDbTarget(string ipAddress)
+    {
+        IpAddressPair pair = IpAddressFormatting.FromString(ipAddress);
+        string v4 = FormatIp(pair.Ipv4);
+        string v6 = FormatIp(pair.Ipv6);
+        return v4 == "—" && v6 == "—" ? ipAddress : $"{v4} / {v6}";
+    }
+
+    private static Color GetAbuseScoreColor(int score) =>
+        score switch
+        {
+            >= 75 => Color.Error,
+            >= 50 => Color.Warning,
+            _ => Color.Success
+        };
 
     private async Task ReloadAttempts()
     {

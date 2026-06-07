@@ -12,7 +12,8 @@ namespace ErsatzTV.Infrastructure.Security;
 public class AdminLoginProtectionService(
     IDbContextFactory<TvContext> dbContextFactory,
     IConfigElementRepository configElementRepository,
-    IAnonymousIpDetectionService anonymousIpDetectionService) : IAdminLoginProtectionService
+    IAnonymousIpDetectionService anonymousIpDetectionService,
+    IAbuseIpDbDetectionService abuseIpDbDetectionService) : IAdminLoginProtectionService
 {
     private const int DefaultMaxFailedAttempts = 5;
     private const int DefaultWindowSeconds = 300;
@@ -50,6 +51,19 @@ public class AdminLoginProtectionService(
             if (vpnLookup.IsBlocked)
             {
                 return new AdminLoginAccessResult(false, vpnLookup.DenyReason);
+            }
+        }
+
+        if (await AdminAbuseIpDbSettings.IsBlockingEnabledAsync(configElementRepository, cancellationToken))
+        {
+            int minScore = await AdminAbuseIpDbSettings.GetMinScoreAsync(configElementRepository, cancellationToken);
+            if (AbuseIpDbDetectionHelper.IsClientIpBlocked(
+                    abuseIpDbDetectionService,
+                    clientIp,
+                    minScore,
+                    out AbuseIpDbLookupResult blockedLookup))
+            {
+                return new AdminLoginAccessResult(false, AdminAbuseIpDbSettings.BuildDenyReason(blockedLookup));
             }
         }
 

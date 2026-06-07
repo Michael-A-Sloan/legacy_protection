@@ -28,6 +28,11 @@ public class UpdateLoginIpSettingsHandler(IConfigElementRepository configElement
             return BaseError.New("Lockout duration must be at least 60 seconds.");
         }
 
+        if (settings.AbuseIpDbMinScore is < 0 or > 100)
+        {
+            return BaseError.New("AbuseIPDB minimum score must be between 0 and 100.");
+        }
+
         await configElementRepository.Upsert(
             ConfigElementKey.AdminLoginIpRateLimitEnabled,
             settings.RateLimitEnabled,
@@ -58,6 +63,18 @@ public class UpdateLoginIpSettingsHandler(IConfigElementRepository configElement
             await configElementRepository.Upsert(
                 ConfigElementKey.AdminLoginGeolocationRequired,
                 settings.GeolocationRequired,
+                cancellationToken);
+        }
+
+        if (AdminAbuseIpDbSettings.IsFeatureAvailable)
+        {
+            await configElementRepository.Upsert(
+                ConfigElementKey.AdminLoginIpAbuseIpDbEnabled,
+                settings.AbuseIpDbBlockEnabled,
+                cancellationToken);
+            await configElementRepository.Upsert(
+                ConfigElementKey.AdminLoginIpAbuseIpDbMinScore,
+                settings.AbuseIpDbMinScore,
                 cancellationToken);
         }
 

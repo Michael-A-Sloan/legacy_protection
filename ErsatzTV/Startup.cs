@@ -203,6 +203,14 @@ public class Startup
             }
         }
 
+        if (AdminAbuseIpDbSettings.IsFeatureAvailable)
+        {
+            Log.Logger.Information(
+                "AbuseIPDB blocking enabled for admin UI (default min score {MinScore}, max age {MaxAgeDays} days).",
+                AdminAbuseIpDbSettings.DefaultMinScore,
+                AdminAbuseIpDbSettings.MaxAgeInDays);
+        }
+
         if (OidcHelper.IsEnabled)
         {
             services.AddAuthentication(options =>
@@ -401,6 +409,22 @@ public class Startup
         else
         {
             services.AddSingleton<IAnonymousIpDetectionService, NullAnonymousIpDetectionService>();
+        }
+
+        if (AdminAbuseIpDbSettings.IsFeatureAvailable)
+        {
+            services.AddHttpClient(
+                "AbuseIpDb",
+                client =>
+                {
+                    client.BaseAddress = new Uri("https://api.abuseipdb.com/api/v2/");
+                    client.Timeout = TimeSpan.FromSeconds(10);
+                });
+            services.AddSingleton<IAbuseIpDbDetectionService, AbuseIpDbDetectionService>();
+        }
+        else
+        {
+            services.AddSingleton<IAbuseIpDbDetectionService, NullAbuseIpDbDetectionService>();
         }
 
         services.AddRazorPages(options =>
@@ -641,6 +665,11 @@ public class Startup
             }
         }
 
+        if (AdminAbuseIpDbSettings.IsFeatureAvailable)
+        {
+            Log.Logger.Information("AbuseIPDB blocking active for admin UI.");
+        }
+
         //app.UseHttpLogging();
         app.UseSerilogRequestLogging(options =>
         {
@@ -756,6 +785,7 @@ public class Startup
                 {
                     blazor.UseMiddleware<BannedIpBlockMiddleware>();
                     blazor.UseMiddleware<VpnBlockMiddleware>();
+                    blazor.UseMiddleware<AbuseIpDbBlockMiddleware>();
                     blazor.UseAuthentication();
 #pragma warning disable ASP0001
                     blazor.UseAuthorization();

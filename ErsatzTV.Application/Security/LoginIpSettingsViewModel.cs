@@ -10,4 +10,7 @@ public class LoginIpSettingsViewModel
     public bool BlacklistEnabled { get; set; } = true;
     public bool GeolocationRequired { get; set; }
     public bool GeolocationRequiredFromEnvironment { get; set; }
+    public bool AbuseIpDbAvailable { get; set; }
+    public bool AbuseIpDbBlockEnabled { get; set; } = true;
+    public int AbuseIpDbMinScore { get; set; } = 75;
 }
