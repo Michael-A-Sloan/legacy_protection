@@ -327,7 +327,7 @@
 
             <MudText Typo="Typo.subtitle1" Class="mb-2">Banned IP Activity</MudText>
             <MudStack Row="true" Spacing="2" Class="mb-4">
-                <MudSelect T="string" @bind-Value="_bannedIpFilter" Label="Filter by banned IP" Style="max-width: 280px" Clearable="true">
+                <MudSelect T="string" Value="@_bannedIpFilter" ValueChanged="OnBannedIpFilterChanged" Label="Filter by banned IP" Style="max-width: 280px" Clearable="true">
                     @foreach (AdminIpRuleViewModel rule in _blacklistRules)
                     {
                         <MudSelectItem T="string" Value="@rule.IpAddress">@FormatIp(rule.IpAddressV4) / @FormatIp(rule.IpAddressV6)</MudSelectItem>
@@ -389,7 +389,14 @@
                     <MudTd>@context.DenyReason</MudTd>
                 </RowTemplate>
                 <NoRecordsContent>
-                    <MudText>No activity from banned IP addresses yet.</MudText>
+                    @if (string.IsNullOrWhiteSpace(_bannedIpFilter))
+                    {
+                        <MudText>Select Activity on a banned IP above, or choose an IP from the filter.</MudText>
+                    }
+                    else
+                    {
+                        <MudText>No activity recorded for this banned IP.</MudText>
+                    }
                 </NoRecordsContent>
                 <PagerContent>
                     <MudTablePager/>
@@ -1068,6 +1075,12 @@
         await ReloadAttempts();
     }
 
+    private async Task OnBannedIpFilterChanged(string ipAddress)
+    {
+        _bannedIpFilter = ipAddress;
+        await ReloadBannedAttempts();
+    }
+
     private bool IsBlacklisted(string ipAddress) =>
         _blacklistRules.Any(r => string.Equals(r.IpAddress, ipAddress, StringComparison.OrdinalIgnoreCase));
 
@@ -1221,6 +1234,11 @@
         TableState state,
         CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(_bannedIpFilter))
+        {
+            return new TableData<AdminLoginAttemptViewModel> { TotalItems = 0, Items = [] };
+        }
+
         GetAdminLoginAttempts query = new(
             state.Page,
             state.PageSize,
