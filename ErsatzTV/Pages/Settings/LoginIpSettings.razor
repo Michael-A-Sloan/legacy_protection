@@ -296,7 +296,7 @@
 
             <MudText Typo="Typo.subtitle1" Class="mb-2">Login IP Activity</MudText>
             <MudStack Row="true" Spacing="2" Class="mb-4">
-                <MudSelect T="string" @bind-Value="_activeIpFilter" Label="Filter by IP" Style="max-width: 280px" Clearable="true">
+                <MudSelect T="string" Value="@_activeIpFilter" ValueChanged="OnActiveIpFilterChanged" Label="Filter by IP" Style="max-width: 280px" Clearable="true">
                     @foreach (AdminLoginIpSummaryViewModel summary in _activeIpFilterOptions)
                     {
                         <MudSelectItem T="string" Value="@summary.IpAddress">@FormatIp(summary.IpAddressV4) / @FormatIp(summary.IpAddressV6)</MudSelectItem>
@@ -406,7 +406,14 @@
                     </MudTd>
                 </RowTemplate>
                 <NoRecordsContent>
-                    <MudText>No login attempts recorded yet.</MudText>
+                    @if (string.IsNullOrWhiteSpace(_activeIpFilter))
+                    {
+                        <MudText>Select Activity on an IP above, or choose an IP from the filter.</MudText>
+                    }
+                    else
+                    {
+                        <MudText>No activity recorded for this IP.</MudText>
+                    }
                 </NoRecordsContent>
                 <PagerContent>
                     <MudTablePager/>
@@ -596,6 +603,12 @@
         await ReloadAttempts();
     }
 
+    private async Task OnActiveIpFilterChanged(string ipAddress)
+    {
+        _activeIpFilter = ipAddress;
+        await ReloadAttempts();
+    }
+
     private bool IsBlacklisted(string ipAddress) =>
         _blacklistRules.Any(r => string.Equals(r.IpAddress, ipAddress, StringComparison.OrdinalIgnoreCase));
 
@@ -684,6 +697,11 @@
         TableState state,
         CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(_activeIpFilter))
+        {
+            return new TableData<AdminLoginAttemptViewModel> { TotalItems = 0, Items = [] };
+        }
+
         await Mediator.Send(
             new SaveConfigElementByKey(ConfigElementKey.LoginIpAttemptsPageSize, state.PageSize.ToString()),
             cancellationToken);
