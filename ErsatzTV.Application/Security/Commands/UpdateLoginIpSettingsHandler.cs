@@ -66,14 +66,17 @@ public class UpdateLoginIpSettingsHandler(IConfigElementRepository configElement
                 cancellationToken);
         }
 
-        await configElementRepository.Upsert(
-            ConfigElementKey.AdminLoginIpAbuseIpDbEnabled,
-            settings.AbuseIpDbBlockEnabled,
-            cancellationToken);
-        await configElementRepository.Upsert(
-            ConfigElementKey.AdminLoginIpAbuseIpDbMinScore,
-            settings.AbuseIpDbMinScore,
-            cancellationToken);
+        if (AdminAbuseIpDbSettings.IsFeatureAvailable)
+        {
+            await configElementRepository.Upsert(
+                ConfigElementKey.AdminLoginIpAbuseIpDbEnabled,
+                settings.AbuseIpDbBlockEnabled,
+                cancellationToken);
+            await configElementRepository.Upsert(
+                ConfigElementKey.AdminLoginIpAbuseIpDbMinScore,
+                settings.AbuseIpDbMinScore,
+                cancellationToken);
+        }
 
         return Unit.Default;
     }

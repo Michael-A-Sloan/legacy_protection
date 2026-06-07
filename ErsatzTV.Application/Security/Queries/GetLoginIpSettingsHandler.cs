@@ -37,10 +37,13 @@ public class GetLoginIpSettingsHandler(IConfigElementRepository configElementRep
                                           ConfigElementKey.AdminLoginGeolocationRequired,
                                           cancellationToken)
                                       .IfNoneAsync(false),
-            AbuseIpDbAvailable = AdminAbuseIpDbSettings.IsApiConfigured,
-            AbuseIpDbBlockEnabled = await configElementRepository
-                .GetValue<bool>(ConfigElementKey.AdminLoginIpAbuseIpDbEnabled, cancellationToken)
-                .IfNoneAsync(true),
+            AbuseIpDbAvailable = AdminAbuseIpDbSettings.IsFeatureAvailable,
+            AbuseIpDbBlockEnabled = AdminAbuseIpDbSettings.IsFeatureAvailable &&
+                                    await configElementRepository
+                                        .GetValue<bool>(
+                                            ConfigElementKey.AdminLoginIpAbuseIpDbEnabled,
+                                            cancellationToken)
+                                        .IfNoneAsync(true),
             AbuseIpDbMinScore = await configElementRepository
                 .GetValue<int>(ConfigElementKey.AdminLoginIpAbuseIpDbMinScore, cancellationToken)
                 .IfNoneAsync(AdminAbuseIpDbSettings.DefaultMinScore)

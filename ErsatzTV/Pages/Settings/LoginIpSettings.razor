@@ -72,31 +72,31 @@
 
             <MudDivider Class="mb-6"/>
             <MudText Typo="Typo.h6" Class="mb-4">AbuseIPDB Blocking</MudText>
-            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
-                <MudText>Block Abusive IPs</MudText>
-                <MudSwitch @bind-Value="_settings.AbuseIpDbBlockEnabled" Color="Color.Primary"/>
-            </MudStack>
-            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
-                <MudText>Minimum Abuse Score</MudText>
-                <MudNumericField @bind-Value="_settings.AbuseIpDbMinScore" Min="0" Max="100" Style="max-width: 200px"/>
-            </MudStack>
-            @if (!_settings.AbuseIpDbAvailable)
+            @if (_settings.AbuseIpDbAvailable)
             {
-                <MudAlert Severity="Severity.Info" Class="mb-4" Variant="Variant.Outlined">
-                    Set <code>ETV_ABUSEIPDB_API_KEY</code> from your
-                    <MudLink Href="https://www.abuseipdb.com/" Target="_blank">AbuseIPDB</MudLink> account in the
-                    container environment, then restart, for lookups and blocking to take effect.
-                    Optional: <code>ETV_ABUSEIPDB_MAX_AGE_DAYS</code> (default 90).
-                </MudAlert>
+                <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                    <MudText>Block Abusive IPs</MudText>
+                    <MudSwitch @bind-Value="_settings.AbuseIpDbBlockEnabled" Color="Color.Primary"/>
+                </MudStack>
+                <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                    <MudText>Minimum Abuse Score</MudText>
+                    <MudNumericField @bind-Value="_settings.AbuseIpDbMinScore" Min="0" Max="100" Style="max-width: 200px"/>
+                </MudStack>
+                <MudText Typo="Typo.body2" Class="mb-8 mud-text-secondary">
+                    Blocks admin UI access when AbuseIPDB reports an abuse confidence score at or above the threshold.
+                    IPTV streaming is not affected. Results are cached for 6 hours. Click <strong>AbuseIPDB</strong> on
+                    any IP below to view the full report.
+                </MudText>
             }
-            <MudText Typo="Typo.body2" Class="mb-8 mud-text-secondary">
-                Blocks admin UI access when AbuseIPDB reports an abuse confidence score at or above the threshold.
-                IPTV streaming is not affected. Results are cached for 6 hours.
-                @if (_settings.AbuseIpDbAvailable)
-                {
-                    @(" Click AbuseIPDB on any IP below to view the full report.")
-                }
-            </MudText>
+            else
+            {
+                <MudText Typo="Typo.body2" Class="mb-8 mud-text-secondary">
+                    Set <code>ETV_ABUSEIPDB_ENABLED=1</code> and <code>ETV_ABUSEIPDB_API_KEY</code> from your
+                    <MudLink Href="https://www.abuseipdb.com/" Target="_blank">AbuseIPDB</MudLink> account to enable
+                    abusive IP blocking for the admin UI. Optional: <code>ETV_ABUSEIPDB_MIN_SCORE</code> (default 75),
+                    <code>ETV_ABUSEIPDB_MAX_AGE_DAYS</code> (default 90).
+                </MudText>
+            }
 
             <MudDivider Class="mb-6"/>
             <MudText Typo="Typo.h6" Class="mb-4">Whitelist</MudText>

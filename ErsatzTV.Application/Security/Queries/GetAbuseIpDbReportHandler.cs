@@ -18,7 +18,7 @@ public class GetAbuseIpDbReportHandler(
             return new AbuseIpDbReportViewModel
             {
                 Configured = false,
-                ErrorMessage = "Set ETV_ABUSEIPDB_API_KEY and restart the container to enable AbuseIPDB lookups."
+                ErrorMessage = "Set ETV_ABUSEIPDB_ENABLED=1 and ETV_ABUSEIPDB_API_KEY to enable AbuseIPDB lookups."
             };
         }
 
