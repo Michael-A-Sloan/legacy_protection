@@ -203,10 +203,10 @@ public class Startup
             }
         }
 
-        if (AdminAbuseIpDbSettings.IsFeatureAvailable)
+        if (AdminAbuseIpDbSettings.IsApiConfigured)
         {
             Log.Logger.Information(
-                "AbuseIPDB blocking enabled for admin UI (default min score {MinScore}, max age {MaxAgeDays} days).",
+                "AbuseIPDB configured for admin UI (default min score {MinScore}, max age {MaxAgeDays} days).",
                 AdminAbuseIpDbSettings.DefaultMinScore,
                 AdminAbuseIpDbSettings.MaxAgeInDays);
         }
@@ -411,7 +411,7 @@ public class Startup
             services.AddSingleton<IAnonymousIpDetectionService, NullAnonymousIpDetectionService>();
         }
 
-        if (AdminAbuseIpDbSettings.IsFeatureAvailable)
+        if (AdminAbuseIpDbSettings.IsApiConfigured)
         {
             services.AddHttpClient(
                 "AbuseIpDb",
@@ -665,9 +665,9 @@ public class Startup
             }
         }
 
-        if (AdminAbuseIpDbSettings.IsFeatureAvailable)
+        if (AdminAbuseIpDbSettings.IsApiConfigured)
         {
-            Log.Logger.Information("AbuseIPDB blocking active for admin UI.");
+            Log.Logger.Information("AbuseIPDB API active for admin UI.");
         }
 
         //app.UseHttpLogging();

@@ -9,12 +9,9 @@ public static class AdminAbuseIpDbSettings
     private const int DefaultMinScoreValue = 75;
     private const int DefaultMaxAgeDaysValue = 90;
 
-    public static bool IsEnabledFromEnvironment =>
-        ParseBoolean(Environment.GetEnvironmentVariable("ETV_ABUSEIPDB_ENABLED"));
-
     public static bool IsApiConfigured => !string.IsNullOrWhiteSpace(ApiKey);
 
-    public static bool IsFeatureAvailable => IsEnabledFromEnvironment && IsApiConfigured;
+    public static bool IsFeatureAvailable => IsApiConfigured;
 
     public static string ApiKey
     {
@@ -33,7 +30,7 @@ public static class AdminAbuseIpDbSettings
         IConfigElementRepository configElementRepository,
         CancellationToken cancellationToken)
     {
-        if (!IsFeatureAvailable)
+        if (!IsApiConfigured)
         {
             return false;
         }
