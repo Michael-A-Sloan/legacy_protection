@@ -36,6 +36,16 @@ public class UpdateLoginIpSettingsHandler(
             return BaseError.New("AbuseIPDB minimum score must be between 0 and 100.");
         }
 
+        if (settings.AutoBanActivityMinFailedAttempts < 1)
+        {
+            return BaseError.New("Auto-ban activity minimum failed attempts must be at least 1.");
+        }
+
+        if (settings.AutoBanActivityWindowDays is < 1 or > 365)
+        {
+            return BaseError.New("Auto-ban activity window must be between 1 and 365 days.");
+        }
+
         List<CustomPublicBlocklistEntry> customLists = settings.PublicBlocklists
             .Where(item => item.IsCustom)
             .Select(item => new CustomPublicBlocklistEntry
@@ -110,6 +120,24 @@ public class UpdateLoginIpSettingsHandler(
         };
 
         await PublicBlocklistSettings.SaveAsync(configElementRepository, blocklistSettings, cancellationToken);
+
+        LoginIpAutoBanSettings existingAutoBanSettings =
+            await LoginIpAutoBanSettings.LoadAsync(configElementRepository, cancellationToken);
+
+        var autoBanSettings = new LoginIpAutoBanSettings
+        {
+            ThreatIntelEnabled = settings.AutoBanThreatIntelEnabled,
+            ActivityEnabled = settings.AutoBanActivityEnabled,
+            ActivityMinFailedAttempts = settings.AutoBanActivityMinFailedAttempts,
+            ActivityWindowDays = settings.AutoBanActivityWindowDays,
+            ActivityIncludeAccessDenied = settings.AutoBanActivityIncludeAccessDenied,
+            LastScanUtc = existingAutoBanSettings.LastScanUtc,
+            LastScanScannedCount = existingAutoBanSettings.LastScanScannedCount,
+            LastScanBannedCount = existingAutoBanSettings.LastScanBannedCount,
+            LastScanSkippedCount = existingAutoBanSettings.LastScanSkippedCount
+        };
+
+        await LoginIpAutoBanSettings.SaveAsync(configElementRepository, autoBanSettings, cancellationToken);
 
         foreach (CustomPublicBlocklistEntry custom in customLists)
         {

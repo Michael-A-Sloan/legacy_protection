@@ -73,5 +73,6 @@ public class ConfigElementKey
     public static ConfigElementKey AdminLoginIpAbuseIpDbEnabled => new("admin.login_ip.abuseipdb_enabled");
     public static ConfigElementKey AdminLoginIpAbuseIpDbMinScore => new("admin.login_ip.abuseipdb_min_score");
     public static ConfigElementKey AdminLoginIpPublicBlocklists => new("admin.login_ip.public_blocklists");
+    public static ConfigElementKey AdminLoginIpAutoBan => new("admin.login_ip.auto_ban");
     public static ConfigElementKey LoginIpAttemptsPageSize => new("pages.login_ip_attempts.page_size");
 }

@@ -10,6 +10,7 @@ using BlazorSortable;
 using Dapper;
 using ErsatzTV.Application;
 using ErsatzTV.Application.Channels;
+using ErsatzTV.Application.Security;
 using ErsatzTV.Application.Streaming;
 using ErsatzTV.Core;
 using ErsatzTV.Core.Emby;
@@ -439,10 +440,13 @@ public class Startup
             services.AddSingleton<PublicBlocklistStore>();
             services.AddSingleton<IPublicBlocklistService, PublicBlocklistService>();
             services.AddHostedService<PublicBlocklistUpdaterService>();
+            services.AddSingleton<ILoginIpAutoBanScanner, LoginIpAutoBanScanner>();
+            services.AddHostedService<LoginIpAutoBanScannerService>();
         }
         else
         {
             services.AddSingleton<IPublicBlocklistService, NullPublicBlocklistService>();
+            services.AddSingleton<ILoginIpAutoBanScanner, NullLoginIpAutoBanScanner>();
         }
 
         services.AddRazorPages(options =>

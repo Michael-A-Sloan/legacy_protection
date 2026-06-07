@@ -5,6 +5,7 @@
 @using ErsatzTV.Core.Domain
 @using ErsatzTV.Core.Domain.Security
 @using ErsatzTV.Core.Networking
+@using ErsatzTV.Core.Interfaces.Security
 @using ErsatzTV.Core.Security
 @implements IDisposable
 @inject IMediator Mediator
@@ -179,6 +180,61 @@
                 <MudNumericField @bind-Value="_newCustomBlocklistUpdateHours" Label="Update every (hours)" Min="1" Max="168" Style="max-width: 200px"/>
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@AddCustomBlocklist">Add List</MudButton>
             </MudStack>
+
+            <MudDivider Class="mb-6"/>
+            <MudText Typo="Typo.h6" Class="mb-4">Automatic IP Scanning</MudText>
+            <MudText Typo="Typo.body2" Class="mb-4 mud-text-secondary">
+                Scan all logged IP addresses that are not already banned. Matching addresses are added to the blacklist automatically.
+                Whitelisted, exempt, and local addresses are skipped. Requires the blacklist to be enabled.
+            </MudText>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <MudText>Auto-ban from Threat Intelligence</MudText>
+                <MudSwitch @bind-Value="_settings.AutoBanThreatIntelEnabled" Color="Color.Primary"/>
+            </MudStack>
+            <MudText Typo="Typo.body2" Class="mb-5 mud-text-secondary">
+                Checks logged IPs against enabled public blocklists and AbuseIPDB (when configured). Runs daily in the background when enabled.
+            </MudText>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <MudText>Auto-ban from Login Activity</MudText>
+                <MudSwitch @bind-Value="_settings.AutoBanActivityEnabled" Color="Color.Primary"/>
+            </MudStack>
+            @if (_settings.AutoBanActivityEnabled)
+            {
+                <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                    <MudText>Minimum Failed Events</MudText>
+                    <MudNumericField @bind-Value="_settings.AutoBanActivityMinFailedAttempts" Min="1" Max="1000" Style="max-width: 200px"/>
+                </MudStack>
+                <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                    <MudText>Activity Window (days)</MudText>
+                    <MudNumericField @bind-Value="_settings.AutoBanActivityWindowDays" Min="1" Max="365" Style="max-width: 200px"/>
+                </MudStack>
+                <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                    <MudText>Include Access Denied Events</MudText>
+                    <MudSwitch @bind-Value="_settings.AutoBanActivityIncludeAccessDenied" Color="Color.Primary"/>
+                </MudStack>
+            }
+            <MudText Typo="Typo.body2" Class="mb-4 mud-text-secondary">
+                Activity auto-ban counts failed login attempts@if (_settings.AutoBanActivityIncludeAccessDenied) { <text> and access-denied events</text> }
+                within the window. Turn this off if you only want threat-intelligence bans.
+            </MudText>
+            <MudStack Row="true" Spacing="2" Class="mb-4">
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@ScanLoggedIpsNow" Disabled="@_scanningLoggedIps">
+                    @(_scanningLoggedIps ? "Scanning..." : "Scan Logged IPs Now")
+                </MudButton>
+            </MudStack>
+            @if (_settings.AutoBanLastScanUtc.HasValue)
+            {
+                <MudText Typo="Typo.body2" Class="mb-8 mud-text-secondary">
+                    Last scan: @FormatLastActivity(_settings.AutoBanLastScanUtc) —
+                    scanned @_settings.AutoBanLastScanScannedCount,
+                    banned @_settings.AutoBanLastScanBannedCount,
+                    skipped @_settings.AutoBanLastScanSkippedCount.
+                </MudText>
+            }
+            else
+            {
+                <MudText Typo="Typo.body2" Class="mb-8 mud-text-secondary">No scan has been run yet.</MudText>
+            }
 
             <MudDivider Class="mb-6"/>
             <MudText Typo="Typo.h6" Class="mb-4">Whitelist</MudText>
@@ -642,6 +698,7 @@
     private AbuseIpDbReportViewModel _abuseIpDbReport;
     private bool _abuseIpDbLoading;
     private bool _refreshingBlocklists;
+    private bool _scanningLoggedIps;
     private string _newCustomBlocklistName;
     private string _newCustomBlocklistUrl;
     private PublicBlocklistFormat _newCustomBlocklistFormat = PublicBlocklistFormat.Mixed;
@@ -791,6 +848,45 @@
         finally
         {
             _refreshingBlocklists = false;
+        }
+    }
+
+    private async Task ScanLoggedIpsNow()
+    {
+        if (!_settings.AutoBanThreatIntelEnabled && !_settings.AutoBanActivityEnabled)
+        {
+            Snackbar.Add("Enable at least one auto-ban option before scanning.", Severity.Warning);
+            return;
+        }
+
+        _scanningLoggedIps = true;
+        try
+        {
+            Either<BaseError, Unit> saveResult = await Mediator.Send(new UpdateLoginIpSettings(_settings), _cts.Token);
+            foreach (BaseError error in saveResult.LeftToSeq())
+            {
+                Snackbar.Add(error.Value, Severity.Error);
+                return;
+            }
+
+            LoginIpAutoBanScanResult result = await Mediator.Send(new ScanLoginIpsForAutoBan(), _cts.Token);
+            _settings = await Mediator.Send(new GetLoginIpSettings(), _cts.Token);
+            await LoadRules(_cts.Token);
+            await LoadActiveIpFilterOptions(_cts.Token);
+            _activeIpSummariesTable?.ReloadServerData();
+            _bannedAttemptsTable?.ReloadServerData();
+
+            Snackbar.Add(
+                $"Scan complete: {result.BannedCount} banned, {result.ScannedIpCount} scanned, {result.SkippedCount} skipped.",
+                result.BannedCount > 0 ? Severity.Success : Severity.Info);
+        }
+        catch (OperationCanceledException)
+        {
+            // do nothing
+        }
+        finally
+        {
+            _scanningLoggedIps = false;
         }
     }
 

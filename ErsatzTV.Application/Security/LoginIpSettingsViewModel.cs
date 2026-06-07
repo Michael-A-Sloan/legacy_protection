@@ -15,4 +15,13 @@ public class LoginIpSettingsViewModel
     public int AbuseIpDbMinScore { get; set; } = 75;
     public bool PublicBlocklistsMasterEnabled { get; set; } = true;
     public List<PublicBlocklistItemViewModel> PublicBlocklists { get; set; } = [];
+    public bool AutoBanThreatIntelEnabled { get; set; } = true;
+    public bool AutoBanActivityEnabled { get; set; }
+    public int AutoBanActivityMinFailedAttempts { get; set; } = 5;
+    public int AutoBanActivityWindowDays { get; set; } = 30;
+    public bool AutoBanActivityIncludeAccessDenied { get; set; } = true;
+    public DateTime? AutoBanLastScanUtc { get; set; }
+    public int AutoBanLastScanScannedCount { get; set; }
+    public int AutoBanLastScanBannedCount { get; set; }
+    public int AutoBanLastScanSkippedCount { get; set; }
 }

@@ -16,6 +16,8 @@ public class GetLoginIpSettingsHandler(
     {
         PublicBlocklistSettings blocklistSettings =
             await PublicBlocklistSettings.LoadAsync(configElementRepository, cancellationToken);
+        LoginIpAutoBanSettings autoBanSettings =
+            await LoginIpAutoBanSettings.LoadAsync(configElementRepository, cancellationToken);
 
         return new LoginIpSettingsViewModel
         {
@@ -55,7 +57,16 @@ public class GetLoginIpSettingsHandler(
                 .GetValue<int>(ConfigElementKey.AdminLoginIpAbuseIpDbMinScore, cancellationToken)
                 .IfNoneAsync(AdminAbuseIpDbSettings.DefaultMinScore),
             PublicBlocklistsMasterEnabled = blocklistSettings.MasterEnabled,
-            PublicBlocklists = BuildPublicBlocklistViewModels(blocklistSettings)
+            PublicBlocklists = BuildPublicBlocklistViewModels(blocklistSettings),
+            AutoBanThreatIntelEnabled = autoBanSettings.ThreatIntelEnabled,
+            AutoBanActivityEnabled = autoBanSettings.ActivityEnabled,
+            AutoBanActivityMinFailedAttempts = autoBanSettings.ActivityMinFailedAttempts,
+            AutoBanActivityWindowDays = autoBanSettings.ActivityWindowDays,
+            AutoBanActivityIncludeAccessDenied = autoBanSettings.ActivityIncludeAccessDenied,
+            AutoBanLastScanUtc = autoBanSettings.LastScanUtc,
+            AutoBanLastScanScannedCount = autoBanSettings.LastScanScannedCount,
+            AutoBanLastScanBannedCount = autoBanSettings.LastScanBannedCount,
+            AutoBanLastScanSkippedCount = autoBanSettings.LastScanSkippedCount
         };
     }
 
