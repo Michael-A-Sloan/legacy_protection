@@ -427,6 +427,24 @@ public class Startup
             services.AddSingleton<IAbuseIpDbDetectionService, NullAbuseIpDbDetectionService>();
         }
 
+        if (AdminProtectionHelper.IsEnabled)
+        {
+            services.AddHttpClient(
+                "PublicBlocklists",
+                client =>
+                {
+                    client.Timeout = TimeSpan.FromSeconds(30);
+                    client.DefaultRequestHeaders.UserAgent.ParseAdd("ErsatzTV-LegacyProtection/1.0");
+                });
+            services.AddSingleton<PublicBlocklistStore>();
+            services.AddSingleton<IPublicBlocklistService, PublicBlocklistService>();
+            services.AddHostedService<PublicBlocklistUpdaterService>();
+        }
+        else
+        {
+            services.AddSingleton<IPublicBlocklistService, NullPublicBlocklistService>();
+        }
+
         services.AddRazorPages(options =>
         {
             if (AdminProtectionHelper.IsEnabled)
@@ -786,6 +804,7 @@ public class Startup
                     blazor.UseMiddleware<BannedIpBlockMiddleware>();
                     blazor.UseMiddleware<VpnBlockMiddleware>();
                     blazor.UseMiddleware<AbuseIpDbBlockMiddleware>();
+                    blazor.UseMiddleware<PublicBlocklistBlockMiddleware>();
                     blazor.UseAuthentication();
 #pragma warning disable ASP0001
                     blazor.UseAuthorization();

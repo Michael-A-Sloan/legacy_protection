@@ -13,4 +13,6 @@ public class LoginIpSettingsViewModel
     public bool AbuseIpDbAvailable { get; set; }
     public bool AbuseIpDbBlockEnabled { get; set; } = true;
     public int AbuseIpDbMinScore { get; set; } = 75;
+    public bool PublicBlocklistsMasterEnabled { get; set; } = true;
+    public List<PublicBlocklistItemViewModel> PublicBlocklists { get; set; } = [];
 }

@@ -99,6 +99,88 @@
             }
 
             <MudDivider Class="mb-6"/>
+            <MudText Typo="Typo.h6" Class="mb-4">Public Blocklists</MudText>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <MudText>Block Public Blocklists</MudText>
+                <MudSwitch @bind-Value="_settings.PublicBlocklistsMasterEnabled" Color="Color.Primary"/>
+            </MudStack>
+            <MudText Typo="Typo.body2" Class="mb-4 mud-text-secondary">
+                Automatically downloads open-source IP blocklists from GitHub and blocks matching addresses from the admin UI.
+                You can also add your own list URLs below. IPTV streaming is not affected. Lists refresh on their own schedule in the background.
+            </MudText>
+            <MudStack Row="true" Spacing="2" Class="mb-4">
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@EnableRecommendedBlocklists">Enable Recommended</MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="@RefreshPublicBlocklists" Disabled="@_refreshingBlocklists">
+                    @(_refreshingBlocklists ? "Refreshing..." : "Refresh All Now")
+                </MudButton>
+            </MudStack>
+            <MudTable Items="@_settings.PublicBlocklists" Dense="true" Class="mb-8" Hover="true">
+                <HeaderContent>
+                    <MudTh>On</MudTh>
+                    <MudTh>List</MudTh>
+                    <MudTh>Category</MudTh>
+                    <MudTh>Entries</MudTh>
+                    <MudTh>Last Updated</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>
+                        <MudSwitch @bind-Value="context.Enabled" Color="Color.Primary"/>
+                    </MudTd>
+                    <MudTd>
+                        <MudText Typo="Typo.body2">@context.Name</MudText>
+                        @if (context.Recommended)
+                        {
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small" Class="mt-1">Recommended</MudChip>
+                        }
+                        @if (context.IsCustom)
+                        {
+                            <MudChip T="string" Color="Color.Info" Size="Size.Small" Class="mt-1">Custom</MudChip>
+                        }
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@context.SourceLabel</MudText>
+                        @if (context.IsCustom)
+                        {
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">@context.SourceUrl</MudText>
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                Updates every @context.UpdateIntervalHours h · @FormatBlocklistFormat(context.Format)
+                            </MudText>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">@context.Description</MudText>
+                        }
+                    </MudTd>
+                    <MudTd>@context.Category</MudTd>
+                    <MudTd>@FormatBlocklistEntries(context)</MudTd>
+                    <MudTd>@FormatBlocklistUpdated(context.LastUpdatedUtc)</MudTd>
+                    <MudTd>@FormatBlocklistStatus(context)</MudTd>
+                    <MudTd>
+                        @if (context.IsCustom)
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
+                                           OnClick="@(_ => RemoveCustomBlocklist(context.Id))"/>
+                        }
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+
+            <MudText Typo="Typo.subtitle1" Class="mb-2">Add Custom Blocklist</MudText>
+            <MudText Typo="Typo.body2" Class="mb-4 mud-text-secondary">
+                Paste a direct link to a plain-text IP list (one IP or CIDR per line). The list will download automatically on save and refresh on your chosen interval.
+            </MudText>
+            <MudStack Row="true" Spacing="2" Class="mb-8" Wrap="Wrap.Wrap">
+                <MudTextField @bind-Value="_newCustomBlocklistName" Label="Name" Style="max-width: 220px"/>
+                <MudTextField @bind-Value="_newCustomBlocklistUrl" Label="List URL" Style="min-width: 320px; flex: 1"/>
+                <MudSelect T="PublicBlocklistFormat" @bind-Value="_newCustomBlocklistFormat" Label="Format" Style="max-width: 180px">
+                    <MudSelectItem T="PublicBlocklistFormat" Value="PublicBlocklistFormat.Mixed">IPs and CIDRs</MudSelectItem>
+                    <MudSelectItem T="PublicBlocklistFormat" Value="PublicBlocklistFormat.IpAddress">IPs only</MudSelectItem>
+                </MudSelect>
+                <MudNumericField @bind-Value="_newCustomBlocklistUpdateHours" Label="Update every (hours)" Min="1" Max="168" Style="max-width: 200px"/>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@AddCustomBlocklist">Add List</MudButton>
+            </MudStack>
+
+            <MudDivider Class="mb-6"/>
             <MudText Typo="Typo.h6" Class="mb-4">Whitelist</MudText>
             <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                 <MudText>Enable Whitelist</MudText>
@@ -559,6 +641,11 @@
     private string _abuseIpDbIp;
     private AbuseIpDbReportViewModel _abuseIpDbReport;
     private bool _abuseIpDbLoading;
+    private bool _refreshingBlocklists;
+    private string _newCustomBlocklistName;
+    private string _newCustomBlocklistUrl;
+    private PublicBlocklistFormat _newCustomBlocklistFormat = PublicBlocklistFormat.Mixed;
+    private int _newCustomBlocklistUpdateHours = 24;
 
     public void Dispose()
     {
@@ -611,6 +698,127 @@
             },
             Right: _ => Snackbar.Add("Successfully saved login IP settings", Severity.Success));
     }
+
+    private void EnableRecommendedBlocklists()
+    {
+        foreach (PublicBlocklistItemViewModel item in _settings.PublicBlocklists.Where(item => item.Recommended))
+        {
+            item.Enabled = true;
+        }
+
+        _settings.PublicBlocklistsMasterEnabled = true;
+    }
+
+    private void AddCustomBlocklist()
+    {
+        if (_settings.PublicBlocklists.Count(item => item.IsCustom) >= PublicBlocklistRegistry.MaxCustomLists)
+        {
+            Snackbar.Add($"You can add at most {PublicBlocklistRegistry.MaxCustomLists} custom blocklists.", Severity.Error);
+            return;
+        }
+
+        var entry = new CustomPublicBlocklistEntry
+        {
+            Name = _newCustomBlocklistName,
+            SourceUrl = _newCustomBlocklistUrl,
+            Format = _newCustomBlocklistFormat,
+            UpdateIntervalHours = _newCustomBlocklistUpdateHours
+        };
+
+        Option<BaseError> validation = PublicBlocklistValidation.ValidateCustomEntry(entry);
+        foreach (BaseError error in validation)
+        {
+            Snackbar.Add(error.Value, Severity.Error);
+            return;
+        }
+
+        if (_settings.PublicBlocklists.Any(item =>
+                item.IsCustom &&
+                string.Equals(item.SourceUrl.Trim(), entry.SourceUrl.Trim(), StringComparison.OrdinalIgnoreCase)))
+        {
+            Snackbar.Add("That URL is already in your custom blocklists.", Severity.Error);
+            return;
+        }
+
+        PublicBlocklistDefinition definition = entry.ToDefinition();
+        _settings.PublicBlocklists.Add(new PublicBlocklistItemViewModel
+        {
+            Id = definition.Id,
+            Name = definition.Name,
+            Category = definition.Category,
+            Description = definition.Description,
+            SourceLabel = definition.SourceLabel,
+            SourceUrl = definition.SourceUrl,
+            Format = definition.Format,
+            UpdateIntervalHours = _newCustomBlocklistUpdateHours,
+            IsCustom = true,
+            Enabled = true
+        });
+
+        _newCustomBlocklistName = string.Empty;
+        _newCustomBlocklistUrl = string.Empty;
+        _newCustomBlocklistFormat = PublicBlocklistFormat.Mixed;
+        _newCustomBlocklistUpdateHours = 24;
+        Snackbar.Add("Custom blocklist added. Click Save Settings to download it.", Severity.Success);
+    }
+
+    private void RemoveCustomBlocklist(string id)
+    {
+        PublicBlocklistItemViewModel item =
+            _settings.PublicBlocklists.FirstOrDefault(entry => entry.IsCustom && entry.Id == id);
+        if (item is null)
+        {
+            return;
+        }
+
+        _settings.PublicBlocklists.Remove(item);
+        Snackbar.Add("Custom blocklist removed. Click Save Settings to apply.", Severity.Info);
+    }
+
+    private async Task RefreshPublicBlocklists()
+    {
+        _refreshingBlocklists = true;
+        try
+        {
+            await Mediator.Send(new RefreshPublicBlocklists(), _cts.Token);
+            _settings = await Mediator.Send(new GetLoginIpSettings(), _cts.Token);
+            Snackbar.Add("Public blocklists refreshed", Severity.Success);
+        }
+        catch (OperationCanceledException)
+        {
+            // do nothing
+        }
+        finally
+        {
+            _refreshingBlocklists = false;
+        }
+    }
+
+    private static string FormatBlocklistEntries(PublicBlocklistItemViewModel item) =>
+        item.NetworkCount > 0
+            ? $"{item.EntryCount:N0} IPs, {item.NetworkCount:N0} networks"
+            : $"{item.EntryCount:N0} IPs";
+
+    private static string FormatBlocklistUpdated(DateTimeOffset? lastUpdatedUtc) =>
+        lastUpdatedUtc?.ToLocalTime().ToString("g", CultureInfo.CurrentCulture.DateTimeFormat) ?? "Pending";
+
+    private static string FormatBlocklistStatus(PublicBlocklistItemViewModel item)
+    {
+        if (item.IsUpdating)
+        {
+            return "Updating";
+        }
+
+        if (!string.IsNullOrWhiteSpace(item.LastError))
+        {
+            return item.LastError;
+        }
+
+        return item.EntryCount > 0 || item.NetworkCount > 0 ? "Ready" : "Waiting for first update";
+    }
+
+    private static string FormatBlocklistFormat(PublicBlocklistFormat format) =>
+        format == PublicBlocklistFormat.IpAddress ? "IPs only" : "IPs and CIDRs";
 
     private async Task AddRule(AdminIpRuleType ruleType)
     {

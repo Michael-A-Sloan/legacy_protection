@@ -1,16 +1,23 @@
 using ErsatzTV.Core.Domain;
 using ErsatzTV.Core.Interfaces.Repositories;
+using ErsatzTV.Core.Interfaces.Security;
 using ErsatzTV.Core.Security;
 
 namespace ErsatzTV.Application.Security;
 
-public class GetLoginIpSettingsHandler(IConfigElementRepository configElementRepository)
+public class GetLoginIpSettingsHandler(
+    IConfigElementRepository configElementRepository,
+    IPublicBlocklistService publicBlocklistService)
     : IRequestHandler<GetLoginIpSettings, LoginIpSettingsViewModel>
 {
     public async Task<LoginIpSettingsViewModel> Handle(
         GetLoginIpSettings request,
-        CancellationToken cancellationToken) =>
-        new()
+        CancellationToken cancellationToken)
+    {
+        PublicBlocklistSettings blocklistSettings =
+            await PublicBlocklistSettings.LoadAsync(configElementRepository, cancellationToken);
+
+        return new LoginIpSettingsViewModel
         {
             RateLimitEnabled = await configElementRepository
                 .GetValue<bool>(ConfigElementKey.AdminLoginIpRateLimitEnabled, cancellationToken)
@@ -46,6 +53,54 @@ public class GetLoginIpSettingsHandler(IConfigElementRepository configElementRep
                                         .IfNoneAsync(true),
             AbuseIpDbMinScore = await configElementRepository
                 .GetValue<int>(ConfigElementKey.AdminLoginIpAbuseIpDbMinScore, cancellationToken)
-                .IfNoneAsync(AdminAbuseIpDbSettings.DefaultMinScore)
+                .IfNoneAsync(AdminAbuseIpDbSettings.DefaultMinScore),
+            PublicBlocklistsMasterEnabled = blocklistSettings.MasterEnabled,
+            PublicBlocklists = BuildPublicBlocklistViewModels(blocklistSettings)
         };
+    }
+
+    private List<PublicBlocklistItemViewModel> BuildPublicBlocklistViewModels(
+        PublicBlocklistSettings blocklistSettings)
+    {
+        IReadOnlyList<PublicBlocklistStatus> statuses = publicBlocklistService.GetStatuses();
+        IReadOnlyList<PublicBlocklistDefinition> definitions = blocklistSettings.GetAllDefinitions();
+
+        return definitions.Select(definition =>
+        {
+            PublicBlocklistStatus status =
+                statuses.FirstOrDefault(s => s.Id == definition.Id) ??
+                new PublicBlocklistStatus(
+                    definition.Id,
+                    definition.Name,
+                    definition.Recommended,
+                    blocklistSettings.IsListEnabled(definition),
+                    0,
+                    0,
+                    null,
+                    null,
+                    string.Empty,
+                    false);
+
+            return new PublicBlocklistItemViewModel
+            {
+                Id = definition.Id,
+                Name = definition.Name,
+                Category = definition.Category,
+                Description = definition.Description,
+                SourceLabel = definition.SourceLabel,
+                SourceUrl = definition.SourceUrl,
+                Format = definition.Format,
+                UpdateIntervalHours = (int)definition.UpdateInterval.TotalHours,
+                Recommended = definition.Recommended,
+                IsCustom = definition.IsCustom,
+                Enabled = blocklistSettings.IsListEnabled(definition),
+                EntryCount = status.EntryCount,
+                NetworkCount = status.NetworkCount,
+                LastUpdatedUtc = status.LastUpdatedUtc,
+                NextUpdateUtc = status.NextUpdateUtc,
+                LastError = status.LastError,
+                IsUpdating = status.IsUpdating
+            };
+        }).ToList();
+    }
 }

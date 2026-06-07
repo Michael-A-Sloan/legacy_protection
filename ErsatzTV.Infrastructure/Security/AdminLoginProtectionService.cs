@@ -13,7 +13,8 @@ public class AdminLoginProtectionService(
     IDbContextFactory<TvContext> dbContextFactory,
     IConfigElementRepository configElementRepository,
     IAnonymousIpDetectionService anonymousIpDetectionService,
-    IAbuseIpDbDetectionService abuseIpDbDetectionService) : IAdminLoginProtectionService
+    IAbuseIpDbDetectionService abuseIpDbDetectionService,
+    IPublicBlocklistService publicBlocklistService) : IAdminLoginProtectionService
 {
     private const int DefaultMaxFailedAttempts = 5;
     private const int DefaultWindowSeconds = 300;
@@ -65,6 +66,15 @@ public class AdminLoginProtectionService(
             {
                 return new AdminLoginAccessResult(false, AdminAbuseIpDbSettings.BuildDenyReason(blockedLookup));
             }
+        }
+
+        PublicBlocklistMatchResult blocklistMatch =
+            await publicBlocklistService.MatchClientIpAsync(clientIp, cancellationToken);
+        if (blocklistMatch.IsBlocked)
+        {
+            return new AdminLoginAccessResult(
+                false,
+                $"IP address matched public blocklist: {blocklistMatch.ListName}.");
         }
 
         LoginIpSettings settings = await GetSettings(cancellationToken);

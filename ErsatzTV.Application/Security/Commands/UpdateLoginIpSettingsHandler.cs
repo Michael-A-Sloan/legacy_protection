@@ -1,10 +1,13 @@
 using ErsatzTV.Core.Domain;
 using ErsatzTV.Core.Interfaces.Repositories;
+using ErsatzTV.Core.Interfaces.Security;
 using ErsatzTV.Core.Security;
 
 namespace ErsatzTV.Application.Security;
 
-public class UpdateLoginIpSettingsHandler(IConfigElementRepository configElementRepository)
+public class UpdateLoginIpSettingsHandler(
+    IConfigElementRepository configElementRepository,
+    IPublicBlocklistService publicBlocklistService)
     : IRequestHandler<UpdateLoginIpSettings, Either<BaseError, Unit>>
 {
     public async Task<Either<BaseError, Unit>> Handle(
@@ -31,6 +34,24 @@ public class UpdateLoginIpSettingsHandler(IConfigElementRepository configElement
         if (settings.AbuseIpDbMinScore is < 0 or > 100)
         {
             return BaseError.New("AbuseIPDB minimum score must be between 0 and 100.");
+        }
+
+        List<CustomPublicBlocklistEntry> customLists = settings.PublicBlocklists
+            .Where(item => item.IsCustom)
+            .Select(item => new CustomPublicBlocklistEntry
+            {
+                Id = item.Id,
+                Name = item.Name,
+                SourceUrl = item.SourceUrl,
+                Format = item.Format,
+                UpdateIntervalHours = item.UpdateIntervalHours
+            })
+            .ToList();
+
+        Option<BaseError> customValidation = PublicBlocklistValidation.ValidateCustomEntries(customLists);
+        foreach (BaseError error in customValidation)
+        {
+            return error;
         }
 
         await configElementRepository.Upsert(
@@ -76,6 +97,23 @@ public class UpdateLoginIpSettingsHandler(IConfigElementRepository configElement
                 ConfigElementKey.AdminLoginIpAbuseIpDbMinScore,
                 settings.AbuseIpDbMinScore,
                 cancellationToken);
+        }
+
+        var blocklistSettings = new PublicBlocklistSettings
+        {
+            MasterEnabled = settings.PublicBlocklistsMasterEnabled,
+            EnabledById = settings.PublicBlocklists.ToDictionary(
+                item => item.Id,
+                item => item.Enabled,
+                StringComparer.OrdinalIgnoreCase),
+            CustomLists = customLists
+        };
+
+        await PublicBlocklistSettings.SaveAsync(configElementRepository, blocklistSettings, cancellationToken);
+
+        foreach (CustomPublicBlocklistEntry custom in customLists)
+        {
+            await publicBlocklistService.RefreshListAsync(custom.Id, cancellationToken);
         }
 
         return Unit.Default;
