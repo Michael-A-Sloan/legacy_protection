@@ -66,7 +66,11 @@ public class GetLoginIpSettingsHandler(
             AutoBanLastScanUtc = autoBanSettings.LastScanUtc,
             AutoBanLastScanScannedCount = autoBanSettings.LastScanScannedCount,
             AutoBanLastScanBannedCount = autoBanSettings.LastScanBannedCount,
-            AutoBanLastScanSkippedCount = autoBanSettings.LastScanSkippedCount
+            AutoBanLastScanSkippedCount = autoBanSettings.LastScanSkippedCount,
+            VpnBlockEnabled = AdminVpnBlockSettings.IsEnabled,
+            ShowVpnProxyBannedIps = await configElementRepository
+                .GetValue<bool>(ConfigElementKey.AdminLoginIpShowVpnProxyBannedIps, cancellationToken)
+                .IfNoneAsync(false)
         };
     }
 

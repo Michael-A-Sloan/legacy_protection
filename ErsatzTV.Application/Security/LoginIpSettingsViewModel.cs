@@ -24,4 +24,6 @@ public class LoginIpSettingsViewModel
     public int AutoBanLastScanScannedCount { get; set; }
     public int AutoBanLastScanBannedCount { get; set; }
     public int AutoBanLastScanSkippedCount { get; set; }
+    public bool VpnBlockEnabled { get; set; }
+    public bool ShowVpnProxyBannedIps { get; set; }
 }

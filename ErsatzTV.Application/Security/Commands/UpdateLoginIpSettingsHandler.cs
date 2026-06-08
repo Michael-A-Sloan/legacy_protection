@@ -139,6 +139,14 @@ public class UpdateLoginIpSettingsHandler(
 
         await LoginIpAutoBanSettings.SaveAsync(configElementRepository, autoBanSettings, cancellationToken);
 
+        if (AdminVpnBlockSettings.IsEnabled)
+        {
+            await configElementRepository.Upsert(
+                ConfigElementKey.AdminLoginIpShowVpnProxyBannedIps,
+                settings.ShowVpnProxyBannedIps,
+                cancellationToken);
+        }
+
         foreach (CustomPublicBlocklistEntry custom in customLists)
         {
             await publicBlocklistService.RefreshListAsync(custom.Id, cancellationToken);

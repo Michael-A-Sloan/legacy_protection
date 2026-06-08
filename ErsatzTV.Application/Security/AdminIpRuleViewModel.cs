@@ -17,4 +17,8 @@ public class AdminIpRuleViewModel
     public int AccessDeniedCount { get; set; }
     public int TotalActivityCount { get; set; }
     public DateTime? LastActivityAt { get; set; }
+    public bool IsVpn { get; set; }
+    public bool IsProxy { get; set; }
+    public bool IsTor { get; set; }
+    public bool IsVpnOrProxy => IsVpn || IsProxy || IsTor;
 }

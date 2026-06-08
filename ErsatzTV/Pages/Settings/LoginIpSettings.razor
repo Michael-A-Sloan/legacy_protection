@@ -281,12 +281,22 @@
             <MudText Typo="Typo.body2" Class="mb-4 mud-text-secondary">
                 Banned addresses keep trying in the background. Activity counts appear here and in Banned IP Activity below, not in the main login log.
             </MudText>
+            @if (_settings.VpnBlockEnabled)
+            {
+                <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                    <MudText>Show VPN / Proxy IPs</MudText>
+                    <MudSwitch T="bool" Value="@_settings.ShowVpnProxyBannedIps" ValueChanged="OnShowVpnProxyBannedIpsChanged" Color="Color.Primary"/>
+                </MudStack>
+                <MudText Typo="Typo.body2" Class="mb-4 mud-text-secondary">
+                    When off, banned addresses identified as VPN, proxy, or Tor are hidden from this list since they are already blocked at the network gate.
+                </MudText>
+            }
             <MudStack Row="true" Spacing="2" Class="mb-4">
                 <MudTextField @bind-Value="_newBlacklistIp" Label="IP Address" Style="max-width: 220px"/>
                 <MudTextField @bind-Value="_newBlacklistNote" Label="Note" Style="max-width: 280px"/>
                 <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="@(_ => AddRule(AdminIpRuleType.Blacklist))">Ban IP</MudButton>
             </MudStack>
-            <MudTable Items="@_blacklistRules" Dense="true" Class="mb-4">
+            <MudTable Items="@VisibleBlacklistRules" Dense="true" Class="mb-4">
                 <HeaderContent>
                     <MudTh>IPv4</MudTh>
                     <MudTh>IPv6</MudTh>
@@ -302,7 +312,26 @@
                 <RowTemplate>
                     <MudTd>@FormatIp(context.IpAddressV4)</MudTd>
                     <MudTd>@FormatIp(context.IpAddressV6)</MudTd>
-                    <MudTd>@context.Note</MudTd>
+                    <MudTd>
+                        @context.Note
+                        @if (context.IsVpnOrProxy)
+                        {
+                            <MudStack Row="true" Spacing="1" Class="mt-1">
+                                @if (context.IsVpn)
+                                {
+                                    <MudChip T="string" Color="Color.Warning" Size="Size.Small">VPN</MudChip>
+                                }
+                                @if (context.IsProxy)
+                                {
+                                    <MudChip T="string" Color="Color.Warning" Size="Size.Small">Proxy</MudChip>
+                                }
+                                @if (context.IsTor)
+                                {
+                                    <MudChip T="string" Color="Color.Warning" Size="Size.Small">Tor</MudChip>
+                                }
+                            </MudStack>
+                        }
+                    </MudTd>
                     <MudTd>@context.PageViewCount</MudTd>
                     <MudTd>@context.LoginAttemptCount</MudTd>
                     <MudTd>@context.AccessDeniedCount</MudTd>
@@ -328,7 +357,7 @@
             <MudText Typo="Typo.subtitle1" Class="mb-2">Banned IP Activity</MudText>
             <MudStack Row="true" Spacing="2" Class="mb-4">
                 <MudSelect T="string" Value="@_bannedIpFilter" ValueChanged="OnBannedIpFilterChanged" Label="Filter by banned IP" Style="max-width: 280px" Clearable="true">
-                    @foreach (AdminIpRuleViewModel rule in _blacklistRules)
+                    @foreach (AdminIpRuleViewModel rule in VisibleBlacklistRules)
                     {
                         <MudSelectItem T="string" Value="@rule.IpAddress">@FormatIp(rule.IpAddressV4) / @FormatIp(rule.IpAddressV6)</MudSelectItem>
                     }
@@ -684,6 +713,12 @@
     private LoginIpSettingsViewModel _settings = new();
     private List<AdminIpRuleViewModel> _whitelistRules = [];
     private List<AdminIpRuleViewModel> _blacklistRules = [];
+
+    private IEnumerable<AdminIpRuleViewModel> VisibleBlacklistRules =>
+        _settings.ShowVpnProxyBannedIps
+            ? _blacklistRules
+            : _blacklistRules.Where(rule => !rule.IsVpnOrProxy);
+
     private MudTable<AdminLoginAttemptViewModel> _attemptsTable;
     private MudTable<AdminLoginAttemptViewModel> _bannedAttemptsTable;
     private MudTable<AdminLoginIpSummaryViewModel> _activeIpSummariesTable;
@@ -1079,6 +1114,23 @@
     {
         _bannedIpFilter = ipAddress;
         await ReloadBannedAttempts();
+    }
+
+    private async Task OnShowVpnProxyBannedIpsChanged(bool showVpnProxyBannedIps)
+    {
+        _settings.ShowVpnProxyBannedIps = showVpnProxyBannedIps;
+
+        if (!showVpnProxyBannedIps && !string.IsNullOrWhiteSpace(_bannedIpFilter))
+        {
+            AdminIpRuleViewModel selected = _blacklistRules.FirstOrDefault(rule =>
+                string.Equals(rule.IpAddress, _bannedIpFilter, StringComparison.OrdinalIgnoreCase));
+
+            if (selected?.IsVpnOrProxy == true)
+            {
+                _bannedIpFilter = null;
+                await ReloadBannedAttempts();
+            }
+        }
     }
 
     private bool IsBlacklisted(string ipAddress) =>

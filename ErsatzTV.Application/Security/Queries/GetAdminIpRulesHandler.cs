@@ -1,11 +1,15 @@
 using ErsatzTV.Core.Domain.Security;
+using ErsatzTV.Core.Interfaces.Security;
 using ErsatzTV.Core.Networking;
+using ErsatzTV.Core.Security;
 using ErsatzTV.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace ErsatzTV.Application.Security;
 
-public class GetAdminIpRulesHandler(IDbContextFactory<TvContext> dbContextFactory)
+public class GetAdminIpRulesHandler(
+    IDbContextFactory<TvContext> dbContextFactory,
+    IAnonymousIpDetectionService anonymousIpDetectionService)
     : IRequestHandler<GetAdminIpRules, List<AdminIpRuleViewModel>>
 {
     public async Task<List<AdminIpRuleViewModel>> Handle(
@@ -29,10 +33,24 @@ public class GetAdminIpRulesHandler(IDbContextFactory<TvContext> dbContextFactor
             ? await LoadBannedActivitySummaries(dbContext, rules, cancellationToken)
             : [];
 
+        bool enrichVpnProxy = request.RuleType == AdminIpRuleType.Blacklist && AdminVpnBlockSettings.IsEnabled;
+
         return rules.Select(r =>
         {
             IpAddressPair pair = IpAddressFormatting.FromString(r.IpAddress);
             activityByRule.TryGetValue(r.IpAddress, out IpAttemptActivitySummary activity);
+
+            bool isVpn = false;
+            bool isProxy = false;
+            bool isTor = false;
+            if (enrichVpnProxy)
+            {
+                AnonymousIpLookupResult metadata =
+                    AnonymousIpDetectionHelper.LookupClientIpMetadata(anonymousIpDetectionService, pair);
+                isVpn = metadata.IsVpn;
+                isProxy = metadata.IsProxy;
+                isTor = metadata.IsTor;
+            }
 
             return new AdminIpRuleViewModel
             {
@@ -47,7 +65,10 @@ public class GetAdminIpRulesHandler(IDbContextFactory<TvContext> dbContextFactor
                 LoginAttemptCount = activity?.LoginAttemptCount ?? 0,
                 AccessDeniedCount = activity?.AccessDeniedCount ?? 0,
                 TotalActivityCount = activity?.TotalActivityCount ?? 0,
-                LastActivityAt = activity?.LastActivityAt
+                LastActivityAt = activity?.LastActivityAt,
+                IsVpn = isVpn,
+                IsProxy = isProxy,
+                IsTor = isTor
             };
         }).ToList();
     }
