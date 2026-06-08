@@ -36,6 +36,22 @@ public class AdminLoginProtectionService(
         return await IsIpInRules(clientIp, AdminIpRuleType.Blacklist, cancellationToken);
     }
 
+    public async Task<bool> IsIpBannedForIptvAsync(IpAddressPair clientIp, CancellationToken cancellationToken)
+    {
+        if (ProtectedIpExemption.IsExempt(clientIp))
+        {
+            return false;
+        }
+
+        LoginIpSettings settings = await GetSettings(cancellationToken);
+        if (!settings.BlacklistEnabled)
+        {
+            return false;
+        }
+
+        return await IsIpInIptvBlockRules(clientIp, cancellationToken);
+    }
+
     public async Task<AdminLoginAccessResult> CheckAccessAsync(
         IpAddressPair clientIp,
         CancellationToken cancellationToken)
@@ -186,6 +202,20 @@ public class AdminLoginProtectionService(
 
         List<string> rules = await dbContext.AdminIpRules.AsNoTracking()
             .Where(r => r.RuleType == ruleType)
+            .Select(r => r.IpAddress)
+            .ToListAsync(cancellationToken);
+
+        return rules.Any(rule => IpAddressFormatting.MatchesRule(rule, clientIp));
+    }
+
+    private async Task<bool> IsIpInIptvBlockRules(
+        IpAddressPair clientIp,
+        CancellationToken cancellationToken)
+    {
+        await using TvContext dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        List<string> rules = await dbContext.AdminIpRules.AsNoTracking()
+            .Where(r => r.RuleType == AdminIpRuleType.Blacklist && r.BlockIptvStreaming)
             .Select(r => r.IpAddress)
             .ToListAsync(cancellationToken);
 

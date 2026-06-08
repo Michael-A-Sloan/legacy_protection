@@ -9,6 +9,8 @@ public interface IAdminLoginProtectionService
 {
     Task<bool> IsIpBannedAsync(IpAddressPair clientIp, CancellationToken cancellationToken);
 
+    Task<bool> IsIpBannedForIptvAsync(IpAddressPair clientIp, CancellationToken cancellationToken);
+
     Task<AdminLoginAccessResult> CheckAccessAsync(IpAddressPair clientIp, CancellationToken cancellationToken);
 
     Task RecordAttemptAsync(

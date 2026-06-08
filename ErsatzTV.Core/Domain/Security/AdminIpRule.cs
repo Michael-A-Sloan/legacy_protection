@@ -7,4 +7,5 @@ public class AdminIpRule
     public AdminIpRuleType RuleType { get; set; }
     public string Note { get; set; }
     public DateTime CreatedAt { get; set; }
+    public bool BlockIptvStreaming { get; set; }
 }

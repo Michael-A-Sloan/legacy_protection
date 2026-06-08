@@ -18,7 +18,7 @@ public sealed class VpnApiAnonymousIpDetectionService(IHttpClientFactory httpCli
 
     public AnonymousIpLookupResult Lookup(string ipAddress)
     {
-        if (!AdminVpnBlockSettings.IsEnabled || !IsConfigured)
+        if (!IsConfigured)
         {
             return new AnonymousIpLookupResult(false, null, false, false, false, false);
         }

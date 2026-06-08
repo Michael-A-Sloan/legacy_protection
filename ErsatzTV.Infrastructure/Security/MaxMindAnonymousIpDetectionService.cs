@@ -43,11 +43,6 @@ public sealed class MaxMindAnonymousIpDetectionService : IAnonymousIpDetectionSe
 
     public AnonymousIpLookupResult Lookup(string ipAddress)
     {
-        if (!AdminVpnBlockSettings.IsEnabled)
-        {
-            return new AnonymousIpLookupResult(false, null, false, false, false, false);
-        }
-
         if (!IsConfigured)
         {
             return new AnonymousIpLookupResult(false, null, false, false, false, false);

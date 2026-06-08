@@ -21,4 +21,5 @@ public class AdminIpRuleViewModel
     public bool IsProxy { get; set; }
     public bool IsTor { get; set; }
     public bool IsVpnOrProxy => IsVpn || IsProxy || IsTor;
+    public bool BlockIptvStreaming { get; set; }
 }

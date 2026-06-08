@@ -68,7 +68,8 @@ public class GetAdminIpRulesHandler(
                 LastActivityAt = activity?.LastActivityAt,
                 IsVpn = isVpn,
                 IsProxy = isProxy,
-                IsTor = isTor
+                IsTor = isTor,
+                BlockIptvStreaming = r.BlockIptvStreaming
             };
         }).ToList();
     }

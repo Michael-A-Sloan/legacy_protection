@@ -1,41 +1,47 @@
 using System.Collections.Concurrent;
 using ErsatzTV.Core.Interfaces.Streaming;
+using ErsatzTV.Core.Networking;
+using ErsatzTV.Core.Streaming;
 
 namespace ErsatzTV.Infrastructure.Streaming;
 
 public class IptvStreamViewerTracker : IIptvStreamViewerTracker
 {
-    private readonly ConcurrentDictionary<(string Channel, string ClientId), DateTimeOffset> _lastActivity = new();
+    public TimeSpan ActivityWindow { get; } = TimeSpan.FromSeconds(60);
 
-    public void RecordActivity(string channelNumber, string clientId)
+    private readonly ConcurrentDictionary<(string Channel, string ClientId), IptvStreamViewerSession> _sessions = new();
+
+    public void RecordActivity(
+        string channelNumber,
+        string clientId,
+        string ipAddress,
+        string ipAddressV4,
+        string ipAddressV6,
+        string userAgent)
     {
         if (string.IsNullOrWhiteSpace(channelNumber) || string.IsNullOrWhiteSpace(clientId))
         {
             return;
         }
 
-        _lastActivity[(channelNumber.Trim(), clientId.Trim())] = DateTimeOffset.UtcNow;
-    }
-
-    public IReadOnlyDictionary<string, int> GetActiveViewerCountsByChannel(TimeSpan activityWindow)
-    {
-        DateTimeOffset cutoff = DateTimeOffset.UtcNow - activityWindow;
-        var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (KeyValuePair<(string Channel, string ClientId), DateTimeOffset> entry in _lastActivity)
+        var session = new IptvStreamViewerSession
         {
-            if (entry.Value < cutoff)
-            {
-                _lastActivity.TryRemove(entry.Key, out _);
-                continue;
-            }
+            ChannelNumber = channelNumber.Trim(),
+            ClientId = clientId.Trim(),
+            IpAddress = ipAddress?.Trim() ?? string.Empty,
+            IpAddressV4 = ipAddressV4?.Trim() ?? string.Empty,
+            IpAddressV6 = ipAddressV6?.Trim() ?? string.Empty,
+            UserAgent = userAgent?.Trim() ?? string.Empty,
+            LastActivityUtc = DateTimeOffset.UtcNow
+        };
 
-            counts.TryGetValue(entry.Key.Channel, out int count);
-            counts[entry.Key.Channel] = count + 1;
-        }
-
-        return counts;
+        _sessions[(session.ChannelNumber, session.ClientId)] = session;
     }
+
+    public IReadOnlyDictionary<string, int> GetActiveViewerCountsByChannel(TimeSpan activityWindow) =>
+        GetActiveViewers(activityWindow)
+            .GroupBy(session => session.ChannelNumber, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
 
     public int GetActiveViewerCount(string channelNumber, TimeSpan activityWindow)
     {
@@ -44,25 +50,77 @@ public class IptvStreamViewerTracker : IIptvStreamViewerTracker
             return 0;
         }
 
+        return GetActiveViewers(activityWindow)
+            .Count(session => string.Equals(session.ChannelNumber, channelNumber, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public IReadOnlyList<IptvStreamViewerSession> GetActiveViewers(TimeSpan activityWindow)
+    {
         DateTimeOffset cutoff = DateTimeOffset.UtcNow - activityWindow;
-        int count = 0;
+        var active = new List<IptvStreamViewerSession>();
 
-        foreach (KeyValuePair<(string Channel, string ClientId), DateTimeOffset> entry in _lastActivity)
+        foreach (KeyValuePair<(string Channel, string ClientId), IptvStreamViewerSession> entry in _sessions)
         {
-            if (!string.Equals(entry.Key.Channel, channelNumber, StringComparison.OrdinalIgnoreCase))
+            if (entry.Value.LastActivityUtc < cutoff)
             {
+                _sessions.TryRemove(entry.Key, out _);
                 continue;
             }
 
-            if (entry.Value < cutoff)
-            {
-                _lastActivity.TryRemove(entry.Key, out _);
-                continue;
-            }
-
-            count++;
+            active.Add(entry.Value);
         }
 
-        return count;
+        return active
+            .OrderBy(session => decimal.TryParse(session.ChannelNumber, out decimal number) ? number : decimal.MaxValue)
+            .ThenBy(session => session.IpAddress, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(session => session.ClientId, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    public void RemoveSessionsMatchingIp(string ipAddress)
+    {
+        if (string.IsNullOrWhiteSpace(ipAddress))
+        {
+            return;
+        }
+
+        IpAddressPair rule = IpAddressFormatting.FromString(ipAddress.Trim());
+        var keysToRemove = new List<(string Channel, string ClientId)>();
+
+        foreach (KeyValuePair<(string Channel, string ClientId), IptvStreamViewerSession> entry in _sessions)
+        {
+            if (SessionMatchesRule(entry.Value, rule))
+            {
+                keysToRemove.Add(entry.Key);
+            }
+        }
+
+        foreach ((string Channel, string ClientId) key in keysToRemove)
+        {
+            _sessions.TryRemove(key, out _);
+        }
+    }
+
+    private static bool SessionMatchesRule(IptvStreamViewerSession session, IpAddressPair rule)
+    {
+        if (!string.IsNullOrWhiteSpace(session.IpAddress) &&
+            IpAddressFormatting.MatchesRule(rule.Canonical, IpAddressFormatting.FromString(session.IpAddress)))
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(session.IpAddressV4) &&
+            IpAddressFormatting.MatchesRule(rule.Canonical, new IpAddressPair(session.IpAddressV4, null)))
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(session.IpAddressV6) &&
+            IpAddressFormatting.MatchesRule(rule.Canonical, new IpAddressPair(null, session.IpAddressV6)))
+        {
+            return true;
+        }
+
+        return false;
     }
 }

@@ -8,6 +8,9 @@ public static class AdminVpnBlockSettings
         ParseBoolean(Environment.GetEnvironmentVariable("ETV_BLOCK_VPN")) ||
         ParseBoolean(Environment.GetEnvironmentVariable("ETV_VPN_BLOCK_ENABLED"));
 
+    public static bool IsDetectionAvailable =>
+        IsApiConfigured || File.Exists(DatabasePath);
+
     public static bool IsApiConfigured => !string.IsNullOrWhiteSpace(ApiKey);
 
     public static string ApiKey

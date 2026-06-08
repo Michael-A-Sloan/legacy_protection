@@ -314,6 +314,10 @@
                     <MudTd>@FormatIp(context.IpAddressV6)</MudTd>
                     <MudTd>
                         @context.Note
+                        @if (context.BlockIptvStreaming)
+                        {
+                            <MudChip T="string" Color="Color.Error" Size="Size.Small" Class="mt-1">IPTV Viewer</MudChip>
+                        }
                         @if (context.IsVpnOrProxy)
                         {
                             <MudStack Row="true" Spacing="1" Class="mt-1">
@@ -346,7 +350,17 @@
                             <MudButton Variant="Variant.Text" Color="Color.Info" Size="Size.Small"
                                        OnClick="@(_ => ShowAbuseIpDbReport(context.IpAddress))">AbuseIPDB</MudButton>
                         }
-                        <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(_ => Unban(context.IpAddress))">Unban</MudButton>
+                        @if (context.BlockIptvStreaming)
+                        {
+                            <MudTooltip Text="Allow IPTV streaming again. Admin access stays banned.">
+                                <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                                           OnClick="@(_ => UnbanViewerOnly(context.IpAddress))">Unban Viewer</MudButton>
+                            </MudTooltip>
+                        }
+                        <MudTooltip Text="Remove this IP from the banned list everywhere.">
+                            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                                       OnClick="@(_ => Unban(context.IpAddress))">Unban</MudButton>
+                        </MudTooltip>
                     </MudTd>
                 </RowTemplate>
                 <NoRecordsContent>
@@ -1004,6 +1018,23 @@
         await ReloadBannedAttempts();
     }
 
+    private async Task UnbanViewerOnly(string ipAddress)
+    {
+        Either<BaseError, Unit> result = await Mediator.Send(new UnbanIptvViewer(ipAddress), _cts.Token);
+        if (result.IsLeft)
+        {
+            Snackbar.Add(result.LeftAsEnumerable().First().Value, Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("IPTV viewer access restored; admin ban remains", Severity.Success);
+        await LoadRules(_cts.Token);
+        await LoadActiveIpFilterOptions(_cts.Token);
+        await ReloadBannedAttempts();
+        await ReloadActiveIpSummaries();
+        await ReloadAttempts();
+    }
+
     private async Task Unban(string ipAddress)
     {
         Either<BaseError, Unit> result = await Mediator.Send(new UnbanIpAddress(ipAddress), _cts.Token);
@@ -1013,7 +1044,7 @@
             return;
         }
 
-        Snackbar.Add("IP unbanned", Severity.Success);
+        Snackbar.Add("IP unbanned everywhere", Severity.Success);
         if (string.Equals(_bannedIpFilter, ipAddress, StringComparison.OrdinalIgnoreCase))
         {
             _bannedIpFilter = null;

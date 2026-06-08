@@ -1,5 +1,6 @@
 @page "/channels"
 @using System.Globalization
+@using ErsatzTV.Application.Security
 @using ErsatzTV.Application.Streaming
 @using ErsatzTV.Application.Channels
 @using ErsatzTV.Application.Configuration
@@ -14,6 +15,7 @@
 @inject IStringLocalizer<ErsatzTV.Locals.Pages.Channels> Loc;
 @inject IStringLocalizer<ErsatzTV.Locals.Shared.Common> CommonLoc;
 @inject IStringLocalizer<ErsatzTV.Locals.Shared.MainLayout> MainLayoutLoc;
+@inject ISnackbar Snackbar
 
 <MudForm Style="max-height: 100%">
     <MudPaper Square="true" Style="display: flex; height: 64px; min-height: 64px; width: 100%; z-index: 100; align-items: center">
@@ -198,6 +200,80 @@
                     <MudTablePager RowsPerPageString="@CommonLoc["LabelRowsPerPage"]" />
                 </PagerContent>
             </MudTable>
+
+            <MudDivider Class="my-6"/>
+            <MudText Typo="Typo.h6" Class="mb-2">Live IPTV Viewers</MudText>
+            <MudText Typo="Typo.body2" Class="mb-4 mud-text-secondary">
+                Shows who is actively streaming right now. Entries disappear when they stop watching or are viewer-banned. IPs are kept in memory only and are not written to the login log. VPN/Proxy/Tor labels are informational only—nothing here is auto-banned. Login Banned means the IP is on the admin banned list but may still stream. Use Ban to block IPTV streaming too.
+            </MudText>
+            <MudTable Items="@_activeViewers" Dense="true" Class="mb-8" Hover="true">
+                <HeaderContent>
+                    <MudTh>Channel</MudTh>
+                    <MudTh>IPv4</MudTh>
+                    <MudTh>IPv6</MudTh>
+                    <MudTh>Network</MudTh>
+                    <MudTh>Client</MudTh>
+                    <MudTh>Last Seen</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>
+                        <MudText Typo="Typo.body2">@context.ChannelNumber</MudText>
+                        @if (!string.IsNullOrWhiteSpace(context.ChannelName))
+                        {
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">@context.ChannelName</MudText>
+                        }
+                    </MudTd>
+                    <MudTd>@FormatViewerIp(context.IpAddressV4)</MudTd>
+                    <MudTd>@FormatViewerIp(context.IpAddressV6)</MudTd>
+                    <MudTd>
+                        @if (context.IsVpn || context.IsProxy || context.IsTor)
+                        {
+                            <MudStack Row="true" Spacing="1">
+                                @if (context.IsVpn)
+                                {
+                                    <MudChip T="string" Color="Color.Warning" Size="Size.Small">VPN</MudChip>
+                                }
+                                @if (context.IsProxy)
+                                {
+                                    <MudChip T="string" Color="Color.Warning" Size="Size.Small">Proxy</MudChip>
+                                }
+                                @if (context.IsTor)
+                                {
+                                    <MudChip T="string" Color="Color.Warning" Size="Size.Small">Tor</MudChip>
+                                }
+                            </MudStack>
+                        }
+                        else
+                        {
+                            @("—")
+                        }
+                    </MudTd>
+                    <MudTd>@FormatViewerUserAgent(context.UserAgent)</MudTd>
+                    <MudTd>@context.LastActivityUtc.ToLocalTime().ToString("G", _dtf)</MudTd>
+                    <MudTd>
+                        @if (context.IsLoginBanned)
+                        {
+                            <MudChip T="string" Color="Color.Error" Size="Size.Small">Login Banned</MudChip>
+                        }
+                        else
+                        {
+                            @("—")
+                        }
+                    </MudTd>
+                    <MudTd>
+                        @if (context.CanBan)
+                        {
+                            <MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small"
+                                       OnClick="@(_ => BanViewer(context.IpAddress))">Ban</MudButton>
+                        }
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText>No active IPTV viewers right now.</MudText>
+                </NoRecordsContent>
+            </MudTable>
         </MudContainer>
     </div>
 </MudForm>
@@ -212,7 +288,9 @@
     private bool _showDisabled;
     private int _rowsPerPage = 10;
     private IReadOnlyDictionary<string, int> _viewerCounts = new Dictionary<string, int>();
+    private List<ActiveIptvViewerViewModel> _activeViewers = [];
     private bool _viewerRefreshStarted;
+    private readonly DateTimeFormatInfo _dtf = CultureInfo.CurrentCulture.DateTimeFormat;
 
     private bool ShowDisabled
     {
@@ -297,6 +375,37 @@
     private async Task RefreshViewerCounts(CancellationToken cancellationToken)
     {
         _viewerCounts = await Mediator.Send(new GetActiveIptvViewerCounts(), cancellationToken);
+        _activeViewers = await Mediator.Send(new GetActiveIptvViewers(), cancellationToken);
+    }
+
+    private async Task BanViewer(string ipAddress)
+    {
+        Either<BaseError, Unit> result = await Mediator.Send(
+            new BanIpAddress(ipAddress, "Banned from live IPTV viewer list", BlockIptvStreaming: true),
+            _cts?.Token ?? CancellationToken.None);
+
+        foreach (BaseError error in result.LeftToSeq())
+        {
+            Snackbar.Add(error.Value, Severity.Error);
+            return;
+        }
+
+        Snackbar.Add("IP address banned", Severity.Success);
+        await RefreshViewerCounts(_cts?.Token ?? CancellationToken.None);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private static string FormatViewerIp(string ip) =>
+        string.IsNullOrWhiteSpace(ip) ? "—" : ip;
+
+    private static string FormatViewerUserAgent(string userAgent)
+    {
+        if (string.IsNullOrWhiteSpace(userAgent))
+        {
+            return "—";
+        }
+
+        return userAgent.Length <= 48 ? userAgent : $"{userAgent[..45]}...";
     }
 
     private int GetActiveViewerCount(string channelNumber) =>

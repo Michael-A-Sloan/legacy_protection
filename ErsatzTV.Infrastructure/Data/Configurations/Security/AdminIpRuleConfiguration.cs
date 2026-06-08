@@ -12,5 +12,6 @@ public class AdminIpRuleConfiguration : IEntityTypeConfiguration<AdminIpRule>
         builder.HasIndex(r => new { r.IpAddress, r.RuleType }).IsUnique();
         builder.Property(r => r.IpAddress).IsRequired();
         builder.Property(r => r.Note).HasDefaultValue(string.Empty);
+        builder.Property(r => r.BlockIptvStreaming).HasDefaultValue(false);
     }
 }

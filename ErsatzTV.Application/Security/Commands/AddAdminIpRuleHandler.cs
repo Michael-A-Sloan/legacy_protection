@@ -1,12 +1,15 @@
 using System.Net;
 using ErsatzTV.Core.Domain.Security;
+using ErsatzTV.Core.Interfaces.Streaming;
 using ErsatzTV.Core.Networking;
 using ErsatzTV.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace ErsatzTV.Application.Security;
 
-public class AddAdminIpRuleHandler(IDbContextFactory<TvContext> dbContextFactory)
+public class AddAdminIpRuleHandler(
+    IDbContextFactory<TvContext> dbContextFactory,
+    IIptvStreamViewerTracker viewerTracker)
     : IRequestHandler<AddAdminIpRule, Either<BaseError, Unit>>
 {
     public async Task<Either<BaseError, Unit>> Handle(
@@ -37,11 +40,26 @@ public class AddAdminIpRuleHandler(IDbContextFactory<TvContext> dbContextFactory
 
         await using TvContext dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        bool exists = await dbContext.AdminIpRules
-            .AnyAsync(r => r.IpAddress == ipAddress && r.RuleType == request.RuleType, cancellationToken);
+        AdminIpRule existing = await dbContext.AdminIpRules
+            .FirstOrDefaultAsync(
+                r => r.IpAddress == ipAddress && r.RuleType == request.RuleType,
+                cancellationToken);
 
-        if (exists)
+        if (existing is not null)
         {
+            if (request.BlockIptvStreaming && !existing.BlockIptvStreaming)
+            {
+                existing.BlockIptvStreaming = true;
+                if (!string.IsNullOrWhiteSpace(request.Note))
+                {
+                    existing.Note = request.Note.Trim();
+                }
+
+                await dbContext.SaveChangesAsync(cancellationToken);
+                viewerTracker.RemoveSessionsMatchingIp(ipAddress);
+                return Unit.Default;
+            }
+
             return BaseError.New("This IP address is already in the list.");
         }
 
@@ -51,10 +69,17 @@ public class AddAdminIpRuleHandler(IDbContextFactory<TvContext> dbContextFactory
                 IpAddress = ipAddress,
                 RuleType = request.RuleType,
                 Note = request.Note?.Trim() ?? string.Empty,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+                BlockIptvStreaming = request.BlockIptvStreaming
             });
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        if (request.BlockIptvStreaming)
+        {
+            viewerTracker.RemoveSessionsMatchingIp(ipAddress);
+        }
+
         return Unit.Default;
     }
 

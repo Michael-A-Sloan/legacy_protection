@@ -394,7 +394,7 @@ public class Startup
 
         services.AddMemoryCache();
 
-        if (AdminVpnBlockSettings.IsEnabled)
+        if (AdminVpnBlockSettings.IsDetectionAvailable)
         {
             services.AddHttpClient(
                 "VpnApi",
@@ -752,6 +752,7 @@ public class Startup
                     new AcceptLanguageHeaderRequestCultureProvider()));
         });
 
+        app.UseMiddleware<IptvBannedIpBlockMiddleware>();
         app.UseMiddleware<IptvStreamViewerMiddleware>();
         app.UseMiddleware<AntiDiscoveryMiddleware>();
 
