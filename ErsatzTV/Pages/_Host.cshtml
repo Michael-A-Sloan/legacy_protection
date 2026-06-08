@@ -12,6 +12,7 @@
 <head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    @await Html.PartialAsync("../Shared/_AntiIndexingHead")
     <title>@if (Assembly.GetEntryAssembly().GetCustomAttribute<AssemblyConfigurationAttribute>()?.Configuration?.ToLower() != "release") { @(System.Environment.MachineName + " ") }ErsatzTV Legacy</title>
     <base href="~/"/>
     <link href="_content/MudBlazor/MudBlazor.min.css?v=@(Assembly.GetAssembly(typeof(AbstractLocalizationInterceptor))?.GetName().Version?.ToString())" rel="stylesheet"/>

@@ -1,5 +1,6 @@
 using ErsatzTV.Core.Interfaces.Security;
 using ErsatzTV.Core.Networking;
+using ErsatzTV.Core.Security;
 
 namespace ErsatzTV.Middleware;
 
@@ -16,7 +17,7 @@ public class BannedIpBlockMiddleware(
         }
 
         string path = context.Request.Path.Value ?? "/";
-        if (IsIgnoredPath(path))
+        if (AdminProtectionPaths.IsIgnoredPath(path))
         {
             await next(context);
             return;
@@ -43,17 +44,4 @@ public class BannedIpBlockMiddleware(
 
         context.Response.Redirect("/access-denied/banned");
     }
-
-    private static bool IsIgnoredPath(string path) =>
-        path.StartsWith("/iptv", StringComparison.OrdinalIgnoreCase) ||
-        path.StartsWith("/discover.json", StringComparison.OrdinalIgnoreCase) ||
-        path.StartsWith("/device.xml", StringComparison.OrdinalIgnoreCase) ||
-        path.StartsWith("/lineup.json", StringComparison.OrdinalIgnoreCase) ||
-        path.StartsWith("/lineup_status.json", StringComparison.OrdinalIgnoreCase) ||
-        path.StartsWith("/_framework", StringComparison.OrdinalIgnoreCase) ||
-        path.StartsWith("/_blazor", StringComparison.OrdinalIgnoreCase) ||
-        path.StartsWith("/css", StringComparison.OrdinalIgnoreCase) ||
-        path.StartsWith("/js", StringComparison.OrdinalIgnoreCase) ||
-        path.StartsWith("/images", StringComparison.OrdinalIgnoreCase) ||
-        path.Equals("/favicon.ico", StringComparison.OrdinalIgnoreCase);
 }

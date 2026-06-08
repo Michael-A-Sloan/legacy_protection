@@ -43,6 +43,7 @@ using ErsatzTV.Core.Scheduling.BlockScheduling;
 using ErsatzTV.Core.Scheduling.Engine;
 using ErsatzTV.Core.Scheduling.ScriptedScheduling;
 using ErsatzTV.Core.Scheduling.YamlScheduling;
+using ErsatzTV.Core.Security;
 using ErsatzTV.Core.Search;
 using ErsatzTV.Core.Trakt;
 using ErsatzTV.Core.Troubleshooting;
@@ -70,7 +71,6 @@ using ErsatzTV.Infrastructure.Runtime;
 using ErsatzTV.Infrastructure.Scheduling;
 using ErsatzTV.Infrastructure.Scripting;
 using ErsatzTV.Infrastructure.Search;
-using ErsatzTV.Core.Security;
 using ErsatzTV.Infrastructure.Security;
 using ErsatzTV.Infrastructure.Sqlite.Data;
 using ErsatzTV.Infrastructure.Streaming;
@@ -753,6 +753,7 @@ public class Startup
         });
 
         app.UseMiddleware<IptvStreamViewerMiddleware>();
+        app.UseMiddleware<AntiDiscoveryMiddleware>();
 
         app.UseStaticFiles();
 
@@ -787,7 +788,7 @@ public class Startup
         app.Use(async (context, next) =>
         {
             if (!context.Request.Host.Value.StartsWith("localhost", StringComparison.OrdinalIgnoreCase) &&
-                !IsIptvPath(context.Request.Path) &&
+                !AdminProtectionPaths.IsIptvPath(context.Request.Path.Value ?? "/") &&
                 context.Connection.LocalPort != Settings.UiPort)
             {
                 context.Response.StatusCode = 404;
@@ -798,7 +799,7 @@ public class Startup
         });
 
         app.MapWhen(
-            ctx => !IsIptvPath(ctx.Request.Path),
+            ctx => !AdminProtectionPaths.IsIptvPath(ctx.Request.Path.Value ?? "/"),
             blazor =>
             {
                 blazor.UseRouting();
@@ -829,37 +830,30 @@ public class Startup
                         endpoints.MapOpenApi();
                     }
 
-                    endpoints.MapScalarApiReference("/docs", options =>
+                    if (!AdminProtectionHelper.IsEnabled)
                     {
-                        options.AddDocument(
-                            "scripted-schedule",
-                            "Scripted Schedule",
-                            "openapi/scripted-schedule-tagged.json");
-                        options.AddDocument("v1", "General", "openapi/v1.json");
-                        options.HideClientButton = true;
-                        options.DocumentDownloadType = DocumentDownloadType.None;
-                        options.Title = "ErsatzTV API Reference";
-                    });
+                        endpoints.MapScalarApiReference("/docs", options =>
+                        {
+                            options.AddDocument(
+                                "scripted-schedule",
+                                "Scripted Schedule",
+                                "openapi/scripted-schedule-tagged.json");
+                            options.AddDocument("v1", "General", "openapi/v1.json");
+                            options.HideClientButton = true;
+                            options.DocumentDownloadType = DocumentDownloadType.None;
+                            options.Title = "ErsatzTV API Reference";
+                        });
+                    }
                 });
             });
 
         app.MapWhen(
-            ctx => IsIptvPath(ctx.Request.Path),
+            ctx => AdminProtectionPaths.IsIptvPath(ctx.Request.Path.Value ?? "/"),
             iptv =>
             {
                 iptv.UseRouting();
                 iptv.UseEndpoints(endpoints => endpoints.MapControllers());
             });
-        return;
-
-        bool IsIptvPath(PathString path)
-        {
-            return path.StartsWithSegments("/iptv") ||
-                   path.StartsWithSegments("/discover.json") ||
-                   path.StartsWithSegments("/device.xml") ||
-                   path.StartsWithSegments("/lineup.json") ||
-                   path.StartsWithSegments("/lineup_status.json");
-        }
     }
 
     private static void CustomServices(IServiceCollection services)

@@ -1,0 +1,3 @@
+# Admin UI is private. Do not index or crawl.
+User-agent: *
+Disallow: /

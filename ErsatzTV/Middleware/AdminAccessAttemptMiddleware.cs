@@ -2,6 +2,7 @@ using ErsatzTV.Authorization;
 using ErsatzTV.Core.Domain.Security;
 using ErsatzTV.Core.Interfaces.Security;
 using ErsatzTV.Core.Networking;
+using ErsatzTV.Core.Security;
 
 namespace ErsatzTV.Middleware;
 
@@ -32,7 +33,7 @@ public class AdminAccessAttemptMiddleware(
         }
 
         string path = context.Request.Path.Value ?? "/";
-        if (IsIgnoredPath(path))
+        if (AdminProtectionPaths.IsIgnoredPath(path))
         {
             return;
         }
@@ -107,14 +108,4 @@ public class AdminAccessAttemptMiddleware(
         return location.Contains("/login", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool IsIgnoredPath(string path) =>
-        path.StartsWith("/iptv", StringComparison.OrdinalIgnoreCase) ||
-        path.StartsWith("/_framework", StringComparison.OrdinalIgnoreCase) ||
-        path.StartsWith("/_blazor", StringComparison.OrdinalIgnoreCase) ||
-        path.StartsWith("/css", StringComparison.OrdinalIgnoreCase) ||
-        path.StartsWith("/js", StringComparison.OrdinalIgnoreCase) ||
-        path.StartsWith("/images", StringComparison.OrdinalIgnoreCase) ||
-        path.StartsWith("/openapi", StringComparison.OrdinalIgnoreCase) ||
-        path.StartsWith("/docs", StringComparison.OrdinalIgnoreCase) ||
-        path.Equals("/favicon.ico", StringComparison.OrdinalIgnoreCase);
 }
