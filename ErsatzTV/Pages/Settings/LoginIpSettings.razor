@@ -11,6 +11,7 @@
 @inject IMediator Mediator
 @inject ISnackbar Snackbar
 @inject ILogger<LoginIpSettings> Logger
+@inject IStringLocalizer<ErsatzTV.Locals.Shared.Common> CommonLoc
 
 <MudForm Style="max-height: 100%">
     <MudPaper Square="true" Style="display: flex; height: 64px; min-height: 64px; width: 100%; z-index: 100; align-items: center">
@@ -115,7 +116,12 @@
                     @(_refreshingBlocklists ? "Refreshing..." : "Refresh All Now")
                 </MudButton>
             </MudStack>
-            <MudTable Items="@_settings.PublicBlocklists" Dense="true" Class="mb-8" Hover="true">
+            <MudTable Items="@_settings.PublicBlocklists"
+                      RowsPerPage="_rowsPerPage"
+                      RowsPerPageChanged="OnRowsPerPageChanged"
+                      Dense="true"
+                      Class="mb-8"
+                      Hover="true">
                 <HeaderContent>
                     <MudTh>On</MudTh>
                     <MudTh>List</MudTh>
@@ -164,6 +170,9 @@
                         }
                     </MudTd>
                 </RowTemplate>
+                <PagerContent>
+                    <MudTablePager RowsPerPageString="@CommonLoc["LabelRowsPerPage"]"/>
+                </PagerContent>
             </MudTable>
 
             <MudText Typo="Typo.subtitle1" Class="mb-2">Add Custom Blocklist</MudText>
@@ -260,7 +269,11 @@
                 <MudTextField @bind-Value="_newWhitelistNote" Label="Note" Style="max-width: 280px"/>
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(_ => AddRule(AdminIpRuleType.Whitelist))">Add to Whitelist</MudButton>
             </MudStack>
-            <MudTable Items="@_whitelistRules" Dense="true" Class="mb-8">
+            <MudTable Items="@_whitelistRules"
+                      RowsPerPage="_rowsPerPage"
+                      RowsPerPageChanged="OnRowsPerPageChanged"
+                      Dense="true"
+                      Class="mb-8">
                 <HeaderContent>
                     <MudTh>IPv4</MudTh>
                     <MudTh>IPv6</MudTh>
@@ -280,6 +293,9 @@
                 <NoRecordsContent>
                     <MudText>No whitelisted IP addresses.</MudText>
                 </NoRecordsContent>
+                <PagerContent>
+                    <MudTablePager RowsPerPageString="@CommonLoc["LabelRowsPerPage"]"/>
+                </PagerContent>
             </MudTable>
 
             <MudDivider Class="mb-6"/>
@@ -306,7 +322,11 @@
                 <MudTextField @bind-Value="_newBlacklistNote" Label="Note" Style="max-width: 280px"/>
                 <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="@(_ => AddRule(AdminIpRuleType.Blacklist))">Ban IP</MudButton>
             </MudStack>
-            <MudTable Items="@VisibleBlacklistRules" Dense="true" Class="mb-4">
+            <MudTable Items="@VisibleBlacklistRules"
+                      RowsPerPage="_rowsPerPage"
+                      RowsPerPageChanged="OnRowsPerPageChanged"
+                      Dense="true"
+                      Class="mb-4">
                 <HeaderContent>
                     <MudTh>IPv4</MudTh>
                     <MudTh>IPv6</MudTh>
@@ -376,6 +396,9 @@
                 <NoRecordsContent>
                     <MudText>No banned IP addresses.</MudText>
                 </NoRecordsContent>
+                <PagerContent>
+                    <MudTablePager RowsPerPageString="@CommonLoc["LabelRowsPerPage"]"/>
+                </PagerContent>
             </MudTable>
 
             <MudText Typo="Typo.subtitle1" Class="mb-2">Banned IP Activity</MudText>
@@ -389,7 +412,8 @@
                 <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@ReloadBannedAttempts">Refresh</MudButton>
             </MudStack>
             <MudTable FixedHeader="true"
-                      @bind-RowsPerPage="@_bannedRowsPerPage"
+                      RowsPerPage="_rowsPerPage"
+                      RowsPerPageChanged="OnRowsPerPageChanged"
                       ServerData="@(new Func<TableState, CancellationToken, Task<TableData<AdminLoginAttemptViewModel>>>(ServerReloadBannedAttempts))"
                       Dense="true"
                       Class="mb-8"
@@ -452,7 +476,7 @@
                     }
                 </NoRecordsContent>
                 <PagerContent>
-                    <MudTablePager/>
+                    <MudTablePager RowsPerPageString="@CommonLoc["LabelRowsPerPage"]"/>
                 </PagerContent>
             </MudTable>
 
@@ -462,7 +486,8 @@
                 Activity is grouped by IP address. Banned IP addresses are excluded here and shown under Banned IP Activity above.
             </MudText>
             <MudTable FixedHeader="true"
-                      @bind-RowsPerPage="@_activeSummaryRowsPerPage"
+                      RowsPerPage="_rowsPerPage"
+                      RowsPerPageChanged="OnRowsPerPageChanged"
                       ServerData="@(new Func<TableState, CancellationToken, Task<TableData<AdminLoginIpSummaryViewModel>>>(ServerReloadActiveIpSummaries))"
                       Dense="true"
                       Class="mb-4"
@@ -526,7 +551,7 @@
                     <MudText>No login attempts recorded yet.</MudText>
                 </NoRecordsContent>
                 <PagerContent>
-                    <MudTablePager/>
+                    <MudTablePager RowsPerPageString="@CommonLoc["LabelRowsPerPage"]"/>
                 </PagerContent>
             </MudTable>
 
@@ -639,7 +664,8 @@
                 </MudAlert>
             }
             <MudTable FixedHeader="true"
-                      @bind-RowsPerPage="@_rowsPerPage"
+                      RowsPerPage="_rowsPerPage"
+                      RowsPerPageChanged="OnRowsPerPageChanged"
                       ServerData="@(new Func<TableState, CancellationToken, Task<TableData<AdminLoginAttemptViewModel>>>(ServerReloadAttempts))"
                       Dense="true"
                       @ref="_attemptsTable">
@@ -723,7 +749,7 @@
                     }
                 </NoRecordsContent>
                 <PagerContent>
-                    <MudTablePager/>
+                    <MudTablePager RowsPerPageString="@CommonLoc["LabelRowsPerPage"]"/>
                 </PagerContent>
             </MudTable>
         </MudContainer>
@@ -747,8 +773,6 @@
     private MudTable<AdminLoginAttemptViewModel> _bannedAttemptsTable;
     private MudTable<AdminLoginIpSummaryViewModel> _activeIpSummariesTable;
     private int _rowsPerPage = 10;
-    private int _bannedRowsPerPage = 10;
-    private int _activeSummaryRowsPerPage = 10;
     private string _searchString;
     private string _bannedIpFilter;
     private string _activeIpFilter;
@@ -1274,10 +1298,31 @@
         await LoadActiveIpFilterOptions(_cts.Token);
     }
 
+    private async Task OnRowsPerPageChanged(int rowsPerPage)
+    {
+        _rowsPerPage = rowsPerPage;
+        await SaveRowsPerPageAsync();
+    }
+
+    private async Task SaveRowsPerPageAsync()
+    {
+        if (_cts is null)
+        {
+            return;
+        }
+
+        await Mediator.Send(
+            new SaveConfigElementByKey(ConfigElementKey.LoginIpAttemptsPageSize, _rowsPerPage.ToString()),
+            _cts.Token);
+    }
+
     private async Task<TableData<AdminLoginIpSummaryViewModel>> ServerReloadActiveIpSummaries(
         TableState state,
         CancellationToken cancellationToken)
     {
+        _rowsPerPage = state.PageSize;
+        await SaveRowsPerPageAsync();
+
         GetAdminLoginIpSummaries query = new(
             state.Page,
             state.PageSize,
@@ -1298,9 +1343,8 @@
             return new TableData<AdminLoginAttemptViewModel> { TotalItems = 0, Items = [] };
         }
 
-        await Mediator.Send(
-            new SaveConfigElementByKey(ConfigElementKey.LoginIpAttemptsPageSize, state.PageSize.ToString()),
-            cancellationToken);
+        _rowsPerPage = state.PageSize;
+        await SaveRowsPerPageAsync();
 
         GetAdminLoginAttempts query = new(
             state.Page,
@@ -1333,6 +1377,9 @@
         {
             return new TableData<AdminLoginAttemptViewModel> { TotalItems = 0, Items = [] };
         }
+
+        _rowsPerPage = state.PageSize;
+        await SaveRowsPerPageAsync();
 
         GetAdminLoginAttempts query = new(
             state.Page,
