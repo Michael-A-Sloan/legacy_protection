@@ -16,6 +16,8 @@ public sealed class LoginIpAutoBanSettings
 
     public bool ActivityIncludeAccessDenied { get; set; } = true;
 
+    public bool VpnEnabled { get; set; }
+
     public DateTime? LastScanUtc { get; set; }
 
     public int LastScanScannedCount { get; set; }
@@ -58,7 +60,7 @@ public sealed class LoginIpAutoBanSettings
             cancellationToken);
     }
 
-    public bool IsAnyScanEnabled => ThreatIntelEnabled || ActivityEnabled;
+    public bool IsAnyScanEnabled => ThreatIntelEnabled || ActivityEnabled || VpnEnabled;
 
     private static LoginIpAutoBanSettings CreateDefaults() => new();
 }

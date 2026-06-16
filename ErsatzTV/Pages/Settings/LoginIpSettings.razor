@@ -198,6 +198,16 @@
                 <MudText>Auto-ban from Login Activity</MudText>
                 <MudSwitch @bind-Value="_settings.AutoBanActivityEnabled" Color="Color.Primary"/>
             </MudStack>
+            @if (_settings.VpnDetectionAvailable)
+            {
+                <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                    <MudText>Auto-ban VPN / Proxy / Tor</MudText>
+                    <MudSwitch @bind-Value="_settings.AutoBanVpnEnabled" Color="Color.Primary"/>
+                </MudStack>
+                <MudText Typo="Typo.body2" Class="mb-5 mud-text-secondary">
+                    Adds logged VPN, proxy, and Tor addresses to the blacklist. These networks are already blocked at the admin gate when VPN blocking is enabled; this keeps them in the banned list for visibility and activity tracking.
+                </MudText>
+            }
             @if (_settings.AutoBanActivityEnabled)
             {
                 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
@@ -281,14 +291,14 @@
             <MudText Typo="Typo.body2" Class="mb-4 mud-text-secondary">
                 Banned addresses keep trying in the background. Activity counts appear here and in Banned IP Activity below, not in the main login log.
             </MudText>
-            @if (_settings.VpnBlockEnabled)
+            @if (_settings.VpnDetectionAvailable)
             {
                 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
                     <MudText>Show VPN / Proxy IPs</MudText>
                     <MudSwitch T="bool" Value="@_settings.ShowVpnProxyBannedIps" ValueChanged="OnShowVpnProxyBannedIpsChanged" Color="Color.Primary"/>
                 </MudStack>
                 <MudText Typo="Typo.body2" Class="mb-4 mud-text-secondary">
-                    When off, banned addresses identified as VPN, proxy, or Tor are hidden from this list since they are already blocked at the network gate.
+                    When off, banned addresses identified as VPN, proxy, or Tor are hidden from this list since they are already blocked at the network gate when VPN blocking is enabled.
                 </MudText>
             }
             <MudStack Row="true" Spacing="2" Class="mb-4">
@@ -909,7 +919,9 @@
 
     private async Task ScanLoggedIpsNow()
     {
-        if (!_settings.AutoBanThreatIntelEnabled && !_settings.AutoBanActivityEnabled)
+        if (!_settings.AutoBanThreatIntelEnabled &&
+            !_settings.AutoBanActivityEnabled &&
+            !_settings.AutoBanVpnEnabled)
         {
             Snackbar.Add("Enable at least one auto-ban option before scanning.", Severity.Warning);
             return;

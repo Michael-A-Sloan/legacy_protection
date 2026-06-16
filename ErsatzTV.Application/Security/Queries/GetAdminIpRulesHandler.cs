@@ -33,7 +33,8 @@ public class GetAdminIpRulesHandler(
             ? await LoadBannedActivitySummaries(dbContext, rules, cancellationToken)
             : [];
 
-        bool enrichVpnProxy = request.RuleType == AdminIpRuleType.Blacklist && AdminVpnBlockSettings.IsEnabled;
+        bool enrichVpnProxy = request.RuleType == AdminIpRuleType.Blacklist &&
+                              anonymousIpDetectionService.IsConfigured;
 
         return rules.Select(r =>
         {

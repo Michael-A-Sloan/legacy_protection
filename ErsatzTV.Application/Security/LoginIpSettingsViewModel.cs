@@ -20,10 +20,12 @@ public class LoginIpSettingsViewModel
     public int AutoBanActivityMinFailedAttempts { get; set; } = 5;
     public int AutoBanActivityWindowDays { get; set; } = 30;
     public bool AutoBanActivityIncludeAccessDenied { get; set; } = true;
+    public bool AutoBanVpnEnabled { get; set; }
     public DateTime? AutoBanLastScanUtc { get; set; }
     public int AutoBanLastScanScannedCount { get; set; }
     public int AutoBanLastScanBannedCount { get; set; }
     public int AutoBanLastScanSkippedCount { get; set; }
     public bool VpnBlockEnabled { get; set; }
+    public bool VpnDetectionAvailable { get; set; }
     public bool ShowVpnProxyBannedIps { get; set; }
 }

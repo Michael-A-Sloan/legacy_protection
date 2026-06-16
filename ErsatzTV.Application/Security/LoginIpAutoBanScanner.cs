@@ -16,6 +16,7 @@ public sealed class LoginIpAutoBanScanner(
     IConfigElementRepository configElementRepository,
     IPublicBlocklistService publicBlocklistService,
     IAbuseIpDbDetectionService abuseIpDbDetectionService,
+    IAnonymousIpDetectionService anonymousIpDetectionService,
     IMediator mediator) : ILoginIpAutoBanScanner
 {
     public async Task<LoginIpAutoBanScanResult> ScanAsync(CancellationToken cancellationToken)
@@ -205,7 +206,44 @@ public sealed class LoginIpAutoBanScanner(
             }
         }
 
+        if (settings.VpnEnabled &&
+            AdminVpnBlockSettings.IsDetectionAvailable &&
+            anonymousIpDetectionService.IsConfigured)
+        {
+            AnonymousIpLookupResult metadata =
+                AnonymousIpDetectionHelper.LookupClientIpMetadata(anonymousIpDetectionService, clientIp);
+            if (metadata.IsVpn || metadata.IsProxy || metadata.IsTor)
+            {
+                return BuildVpnAutoBanReason(metadata);
+            }
+        }
+
         return string.Empty;
+    }
+
+    private static string BuildVpnAutoBanReason(AnonymousIpLookupResult metadata)
+    {
+        if (metadata.IsTor)
+        {
+            return "Auto-banned: Tor exit node.";
+        }
+
+        if (metadata.IsVpn && metadata.IsProxy)
+        {
+            return "Auto-banned: VPN and proxy network.";
+        }
+
+        if (metadata.IsVpn)
+        {
+            return "Auto-banned: VPN network.";
+        }
+
+        if (metadata.IsProxy)
+        {
+            return "Auto-banned: proxy network.";
+        }
+
+        return "Auto-banned: anonymous network.";
     }
 
     private static IpAddressPair GetSummaryPair(IpAttemptActivitySummary summary)

@@ -46,6 +46,12 @@ public class UpdateLoginIpSettingsHandler(
             return BaseError.New("Auto-ban activity window must be between 1 and 365 days.");
         }
 
+        if (settings.AutoBanVpnEnabled && !AdminVpnBlockSettings.IsDetectionAvailable)
+        {
+            return BaseError.New(
+                "VPN/proxy auto-ban requires VPNAPI or a MaxMind Anonymous IP database to be configured.");
+        }
+
         List<CustomPublicBlocklistEntry> customLists = settings.PublicBlocklists
             .Where(item => item.IsCustom)
             .Select(item => new CustomPublicBlocklistEntry
@@ -131,6 +137,7 @@ public class UpdateLoginIpSettingsHandler(
             ActivityMinFailedAttempts = settings.AutoBanActivityMinFailedAttempts,
             ActivityWindowDays = settings.AutoBanActivityWindowDays,
             ActivityIncludeAccessDenied = settings.AutoBanActivityIncludeAccessDenied,
+            VpnEnabled = settings.AutoBanVpnEnabled,
             LastScanUtc = existingAutoBanSettings.LastScanUtc,
             LastScanScannedCount = existingAutoBanSettings.LastScanScannedCount,
             LastScanBannedCount = existingAutoBanSettings.LastScanBannedCount,
@@ -139,7 +146,7 @@ public class UpdateLoginIpSettingsHandler(
 
         await LoginIpAutoBanSettings.SaveAsync(configElementRepository, autoBanSettings, cancellationToken);
 
-        if (AdminVpnBlockSettings.IsEnabled)
+        if (AdminVpnBlockSettings.IsDetectionAvailable)
         {
             await configElementRepository.Upsert(
                 ConfigElementKey.AdminLoginIpShowVpnProxyBannedIps,
