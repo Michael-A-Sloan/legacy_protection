@@ -18,22 +18,31 @@ public sealed class LoginIpAutoBanScannerService(
         using PeriodicTimer timer = new(ScanInterval);
         while (await timer.WaitForNextTickAsync(stoppingToken))
         {
-            try
-            {
-                LoginIpAutoBanSettings settings =
-                    await LoginIpAutoBanSettings.LoadAsync(configElementRepository, stoppingToken);
+            await RunScanCycleAsync(stoppingToken);
+        }
+    }
 
-                if (!settings.IsAnyScanEnabled)
-                {
-                    continue;
-                }
+    private async Task RunScanCycleAsync(CancellationToken stoppingToken)
+    {
+        try
+        {
+            LoginIpAutoBanSettings settings =
+                await LoginIpAutoBanSettings.LoadAsync(configElementRepository, stoppingToken);
 
-                await scanner.ScanAsync(stoppingToken);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            if (!settings.IsAnyScanEnabled)
             {
-                logger.LogWarning(ex, "Login IP auto-ban scan cycle failed");
+                return;
             }
+
+            await scanner.ScanAsync(stoppingToken);
+        }
+        catch (Exception ex) when (BackgroundServiceExceptionHelper.IsShutdownCancellation(ex, stoppingToken))
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Login IP auto-ban scan cycle failed");
         }
     }
 }

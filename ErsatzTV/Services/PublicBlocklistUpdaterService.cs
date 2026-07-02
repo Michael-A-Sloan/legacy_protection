@@ -12,26 +12,28 @@ public sealed class PublicBlocklistUpdaterService(
     {
         logger.LogInformation("Public blocklist updater started");
 
-        try
-        {
-            await publicBlocklistService.RefreshDueListsAsync(stoppingToken);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            logger.LogWarning(ex, "Initial public blocklist refresh failed");
-        }
+        await RunRefreshCycleAsync(stoppingToken);
 
         using PeriodicTimer timer = new(PollInterval);
         while (await timer.WaitForNextTickAsync(stoppingToken))
         {
-            try
-            {
-                await publicBlocklistService.RefreshDueListsAsync(stoppingToken);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                logger.LogWarning(ex, "Public blocklist refresh cycle failed");
-            }
+            await RunRefreshCycleAsync(stoppingToken);
+        }
+    }
+
+    private async Task RunRefreshCycleAsync(CancellationToken stoppingToken)
+    {
+        try
+        {
+            await publicBlocklistService.RefreshDueListsAsync(stoppingToken);
+        }
+        catch (Exception ex) when (BackgroundServiceExceptionHelper.IsShutdownCancellation(ex, stoppingToken))
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Public blocklist refresh cycle failed");
         }
     }
 }

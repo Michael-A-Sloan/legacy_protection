@@ -87,12 +87,30 @@ public sealed class PublicBlocklistService(
                 parsed.IpAddresses.Count,
                 parsed.Networks.Count);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            store.SetSnapshot(definition.Id, new PublicBlocklistParseResult([], []), ex.Message);
+            store.ClearUpdating(definition.Id);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            store.SetSnapshot(
+                definition.Id,
+                new PublicBlocklistParseResult([], []),
+                GetRefreshErrorMessage(ex));
             Log.Logger.Warning(ex, "Public blocklist {ListId} update failed", definition.Id);
         }
     }
+
+    private static string GetRefreshErrorMessage(Exception ex) =>
+        ex switch
+        {
+            TimeoutException => "Download timed out.",
+            TaskCanceledException => "Download timed out.",
+            HttpRequestException requestException when requestException.StatusCode.HasValue =>
+                $"Download failed ({(int)requestException.StatusCode.Value}).",
+            _ => ex.Message
+        };
 
     public async Task RefreshDueListsAsync(CancellationToken cancellationToken)
     {
@@ -105,9 +123,22 @@ public sealed class PublicBlocklistService(
             bool due = !status.LastUpdatedUtc.HasValue ||
                        DateTimeOffset.UtcNow - status.LastUpdatedUtc.Value >= definition.UpdateInterval;
 
-            if (due && !status.IsUpdating)
+            if (!due || status.IsUpdating)
+            {
+                continue;
+            }
+
+            try
             {
                 await RefreshListAsync(definition.Id, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Log.Logger.Warning(ex, "Public blocklist {ListId} refresh failed", definition.Id);
             }
         }
     }

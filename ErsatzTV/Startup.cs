@@ -434,7 +434,7 @@ public class Startup
                 "PublicBlocklists",
                 client =>
                 {
-                    client.Timeout = TimeSpan.FromSeconds(30);
+                    client.Timeout = TimeSpan.FromMinutes(3);
                     client.DefaultRequestHeaders.UserAgent.ParseAdd("ErsatzTV-LegacyProtection/1.0");
                 });
             services.AddSingleton<PublicBlocklistStore>();

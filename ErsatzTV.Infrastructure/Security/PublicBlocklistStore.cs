@@ -28,6 +28,14 @@ public sealed class PublicBlocklistStore
             (_, existing) => existing with { IsUpdating = true });
     }
 
+    public void ClearUpdating(string listId)
+    {
+        _lists.AddOrUpdate(
+            listId,
+            _ => new ListSnapshot([], [], null, string.Empty, false),
+            (_, existing) => existing with { IsUpdating = false });
+    }
+
     public bool TryMatch(string listId, IpAddressPair clientIp, out string matchedAddress)
     {
         matchedAddress = string.Empty;
